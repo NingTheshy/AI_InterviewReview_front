@@ -1,0 +1,25 @@
+// 若依风格主题变量
+:root {
+  --el-color-primary: #409eff;
+  --el-color-success: #67c23a;
+  --el-color-warning: #e6a23c;
+  --el-color-danger: #f56c6c;
+  --el-color-info: #909399;
+
+  // 侧边栏（深色经典主题）
+  --sidebar-bg: #304156;
+  --sidebar-text: #bfcbd9;
+  --sidebar-active-text: #409eff;
+  --sidebar-width: 210px;
+  --sidebar-collapsed-width: 64px;
+
+  // 布局
+  --navbar-height: 50px;
+  --tagsview-height: 34px;
+
+  // 内容区
+  --content-bg: #f0f2f5;
+
+  // 阴影
+  --box-shadow-light: 0 1px 4px rgba(0, 21, 41, 0.08);
+}
