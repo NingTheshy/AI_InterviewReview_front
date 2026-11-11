@@ -72,6 +72,7 @@ onMounted(() => {
       </template>
 
       <el-table :data="tableData" v-loading="loading" stripe>
+        <el-table-column prop="experienceId" label="面经ID" width="90" />
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户" width="120" />
         <el-table-column prop="content" label="评论内容" min-width="300" show-overflow-tooltip />
@@ -80,7 +81,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-permission="'comment:manage'" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>

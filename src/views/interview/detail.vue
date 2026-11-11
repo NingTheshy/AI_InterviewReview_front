@@ -1,10 +1,15 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getInterviewDetail, getInterviewNote, saveInterviewNote, getQuestionNote, saveQuestionNote } from '@/api/interview'
+import {
+  getInterviewDetail, getInterviewNote, saveInterviewNote,
+  getQuestionNote, saveQuestionNote, updateSpeakerRoles
+} from '@/api/interview'
 import { addFavorite } from '@/api/favorite'
-import { createShare } from '@/api/share'
+import {
+  publishExperience, getPublication, updatePublication, withdrawPublication
+} from '@/api/publication'
 import axios from 'axios'
 import { getToken } from '@/utils/auth'
 import * as echarts from 'echarts'
@@ -108,28 +113,87 @@ async function handleFavoriteQuestion(questionId) {
   }
 }
 
-// 生成分享链接
-const shareDialogVisible = ref(false)
-const shareUrl = ref('')
-const shareLoading = ref(false)
+// 公开面经发布
+const publicationDialogVisible = ref(false)
+const publication = ref(null)
+const publicationSummary = ref('')
+const publicationLoading = ref(false)
 
-async function handleShare() {
-  shareLoading.value = true
+async function openPublicationDialog() {
+  publicationLoading.value = true
   try {
-    const res = await createShare(route.params.id, { expireType: 'never', isPublic: true })
-    const token = res.data?.token || res.data
-    shareUrl.value = `${window.location.origin}/share/${token}`
-    shareDialogVisible.value = true
-  } catch (error) {
-    // 错误已在拦截器中处理
+    const res = await getPublication(route.params.id)
+    publication.value = res.data
+    publicationSummary.value = res.data?.summaryMarkdown || ''
+  } catch {
+    publication.value = null
+    publicationSummary.value = ''
   } finally {
-    shareLoading.value = false
+    publicationLoading.value = false
+    publicationDialogVisible.value = true
   }
 }
 
-function copyShareUrl() {
-  navigator.clipboard.writeText(shareUrl.value)
-  ElMessage.success('链接已复制')
+async function savePublication() {
+  if (publicationSummary.value.length > 10000) {
+    ElMessage.warning('经验总结不能超过 10000 字')
+    return
+  }
+  publicationLoading.value = true
+  try {
+    const res = publication.value
+      ? await updatePublication(route.params.id, publicationSummary.value)
+      : await publishExperience(route.params.id, publicationSummary.value)
+    publication.value = res.data
+    ElMessage.success(publication.value?.publishStatus === 'PUBLISHED' ? '面经已发布' : '面经已保存')
+  } finally {
+    publicationLoading.value = false
+  }
+}
+
+async function handleWithdrawPublication() {
+  await ElMessageBox.confirm('撤回后公开页面和评论将隐藏，之后可以重新发布。', '撤回面经', { type: 'warning' })
+  await withdrawPublication(route.params.id)
+  publication.value = null
+  publicationDialogVisible.value = false
+  ElMessage.success('面经已撤回')
+}
+
+function openPublishedExperience() {
+  if (publication.value?.id) window.open(`/experiences/${publication.value.id}`, '_blank')
+}
+
+// 说话人角色校正
+const speakerDialogVisible = ref(false)
+const speakerMappings = ref([])
+const transcriptSegments = computed(() => {
+  const value = interview.value?.transcriptSegments
+  if (Array.isArray(value)) return value
+  return value?.sentences || value?.segments || []
+})
+
+function openSpeakerDialog() {
+  const speakers = new Map()
+  transcriptSegments.value.forEach(segment => {
+    if (segment.speakerId && !speakers.has(segment.speakerId)) {
+      speakers.set(segment.speakerId,
+        ['CANDIDATE', 'INTERVIEWER'].includes(segment.speakerRole) ? segment.speakerRole : '')
+    }
+  })
+  speakerMappings.value = Array.from(speakers, ([speakerId, role]) => ({ speakerId, role }))
+  speakerDialogVisible.value = true
+}
+
+async function saveSpeakerMappings() {
+  const mappings = speakerMappings.value.filter(item => ['CANDIDATE', 'INTERVIEWER'].includes(item.role))
+  if (!mappings.length) {
+    ElMessage.warning('请至少为一个说话人选择候选人或面试官角色')
+    return
+  }
+  await updateSpeakerRoles(route.params.id, mappings)
+  speakerDialogVisible.value = false
+  ElMessage.success('角色映射已保存，正在重新分析')
+  fetchDetail()
 }
 
 // 题目类型映射
@@ -268,9 +332,12 @@ onMounted(() => {
           </div>
         </div>
         <div class="hero-actions">
-          <el-button round :loading="shareLoading" @click="handleShare">
-            <el-icon><Share /></el-icon>
-            分享
+          <el-button v-if="transcriptSegments.length" v-permission="'interview:manage'" round @click="openSpeakerDialog">
+            校正说话人
+          </el-button>
+          <el-button v-if="interview.status === 1" v-permission="'experience:publish'" round :loading="publicationLoading" @click="openPublicationDialog">
+            <el-icon><Promotion /></el-icon>
+            发布面经
           </el-button>
           <div class="hero-score" v-if="interview.overallScore != null">
             <div class="big-score" :style="{ color: getScoreColor(interview.overallScore) }">
@@ -282,6 +349,15 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <el-alert
+        v-if="interview.status !== 1 || interview.reanalysisStatus"
+        :type="interview.status === 2 ? 'error' : 'info'"
+        :closable="false"
+        show-icon
+        class="status-alert"
+        :title="interview.status === 0 ? `处理中：${interview.processingStep || 0}/4` : interview.status === 2 ? (interview.errorMessage || '处理失败') : interview.status === 3 ? '处理已取消，可从列表继续重试' : `重新分析状态：${interview.reanalysisStatus}`"
+      />
 
       <!-- 音频播放器 -->
       <div class="section-card" v-if="interview.audioFilePath">
@@ -363,8 +439,20 @@ onMounted(() => {
 
       <!-- 转写文本 -->
       <div class="section-card" v-if="interview.transcriptText">
-        <h3 class="section-title">📄 转写文本</h3>
-        <div class="transcript-text">{{ interview.transcriptText }}</div>
+        <h3 class="section-title">📄 角色化转写</h3>
+        <div v-if="transcriptSegments.length" class="segment-list">
+          <div v-for="(segment, index) in transcriptSegments" :key="`${segment.startTimeMs}-${index}`" class="segment-item">
+            <div class="segment-meta">
+              <el-tag size="small" :type="segment.speakerRole === 'CANDIDATE' ? 'success' : segment.speakerRole === 'INTERVIEWER' ? 'primary' : 'info'">
+                {{ segment.speakerRole === 'CANDIDATE' ? '候选人' : segment.speakerRole === 'INTERVIEWER' ? '面试官' : '未知角色' }}
+              </el-tag>
+              <span>{{ segment.speakerId || 'unknown' }}</span>
+              <span>{{ Math.floor((segment.startTimeMs || 0) / 1000) }}s–{{ Math.floor((segment.endTimeMs || 0) / 1000) }}s</span>
+            </div>
+            <p>{{ segment.text }}</p>
+          </div>
+        </div>
+        <div v-else class="transcript-text">{{ interview.transcriptText }}</div>
       </div>
 
       <!-- 题目评分 -->
@@ -380,8 +468,10 @@ onMounted(() => {
             <template #title>
               <div class="question-header">
                 <span class="question-index">第 {{ q.questionIndex }} 题</span>
+                <el-tag size="small" effect="plain">{{ q.questionType || '未分类' }}</el-tag>
+                <el-tag v-if="!q.includedInScore" size="small" type="info">低置信度·不计分</el-tag>
                 <span class="question-score" :style="{ color: getScoreColor(q.score) }">
-                  {{ q.score }} 分
+                  {{ q.score == null ? '--' : `${q.score} 分` }}
                 </span>
                 <el-button
                   type="warning"
@@ -428,6 +518,10 @@ onMounted(() => {
                 <h4>💡 改进建议</h4>
                 <p>{{ q.improvementTip }}</p>
               </div>
+              <div class="question-section difference" v-if="q.answerDifference">
+                <h4>🔎 关键差距</h4>
+                <p>{{ q.answerDifference }}</p>
+              </div>
               <div class="question-section ref" v-if="q.referenceAnswer">
                 <h4>📖 参考答案</h4>
                 <p>{{ q.referenceAnswer }}</p>
@@ -449,6 +543,16 @@ onMounted(() => {
         </el-collapse>
       </div>
 
+      <div class="section-card" v-if="interview.archivedQuestions?.length">
+        <h3 class="section-title">🗃️ 已归档问题（{{ interview.archivedQuestions.length }}）</h3>
+        <el-collapse>
+          <el-collapse-item v-for="q in interview.archivedQuestions" :key="q.id" :title="q.questionText" :name="q.id">
+            <p>{{ q.answerText }}</p>
+            <el-button size="small" type="warning" plain @click="handleFavoriteQuestion(q.id)">收藏/查看历史内容</el-button>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+
       <!-- 面试笔记 -->
       <div class="section-card">
         <h3 class="section-title">📝 面试笔记</h3>
@@ -463,14 +567,50 @@ onMounted(() => {
         </el-button>
       </div>
 
-      <!-- 分享对话框 -->
-      <el-dialog v-model="shareDialogVisible" title="分享面试复盘" width="480px">
-        <p style="margin-bottom: 12px; color: #606266;">复制以下链接分享给他人，对方无需登录即可查看：</p>
-        <el-input v-model="shareUrl" readonly>
-          <template #append>
-            <el-button @click="copyShareUrl">复制</el-button>
-          </template>
-        </el-input>
+      <el-dialog v-model="publicationDialogVisible" title="公开面经" width="620px">
+        <el-alert
+          v-if="publication?.moderationStatus === 'BLOCKED'"
+          type="error"
+          :closable="false"
+          title="该面经已被管理员下架，用户无法自行重新发布"
+          style="margin-bottom: 14px"
+        />
+        <el-input
+          v-model="publicationSummary"
+          type="textarea"
+          :rows="10"
+          maxlength="10000"
+          show-word-limit
+          placeholder="使用 Markdown 总结本次面试经验。公开内容不会包含音频、简历、完整转写、原回答和私人笔记。"
+        />
+        <template #footer>
+          <el-button v-if="publication" type="danger" plain @click="handleWithdrawPublication">撤回</el-button>
+          <el-button v-if="publication?.id" @click="openPublishedExperience">查看公开页</el-button>
+          <el-button
+            type="primary"
+            :loading="publicationLoading"
+            :disabled="publication?.moderationStatus === 'BLOCKED'"
+            @click="savePublication"
+          >
+            {{ publication ? '保存并重新发布' : '立即发布' }}
+          </el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="speakerDialogVisible" title="校正说话人角色" width="520px">
+        <p class="dialog-hint">只修改角色映射，不改变原始转写文本和时间戳；保存后仅重新执行问答识别和评分。</p>
+        <div v-for="mapping in speakerMappings" :key="mapping.speakerId" class="speaker-row">
+          <strong>{{ mapping.speakerId }}</strong>
+          <el-select v-model="mapping.role" style="width: 180px">
+            <el-option label="候选人" value="CANDIDATE" />
+            <el-option label="面试官" value="INTERVIEWER" />
+            <el-option label="保持未知（不提交）" value="" />
+          </el-select>
+        </div>
+        <template #footer>
+          <el-button @click="speakerDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveSpeakerMappings">保存并重新分析</el-button>
+        </template>
       </el-dialog>
     </template>
   </div>
@@ -483,6 +623,51 @@ onMounted(() => {
 
 .back-bar {
   margin-bottom: 16px;
+}
+
+.status-alert {
+  margin: 14px 0;
+}
+
+.segment-list {
+  display: grid;
+  gap: 12px;
+}
+
+.segment-item {
+  padding: 14px 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.segment-item p {
+  margin: 8px 0 0;
+  line-height: 1.75;
+}
+
+.segment-meta,
+.speaker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.segment-meta span {
+  color: #909399;
+  font-size: 12px;
+}
+
+.speaker-row {
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.dialog-hint {
+  margin-top: 0;
+  color: #606266;
+  line-height: 1.6;
 }
 
 /* 顶部信息卡片 */

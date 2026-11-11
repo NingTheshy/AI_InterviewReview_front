@@ -45,7 +45,7 @@ function toggleFullscreen() {
         <Expand v-else />
       </el-icon>
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/admin/stats' }">首页</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/management/stats' }">首页</el-breadcrumb-item>
         <el-breadcrumb-item v-if="route.meta?.title">
           {{ route.meta.title }}
         </el-breadcrumb-item>
@@ -78,13 +78,14 @@ function toggleFullscreen() {
 
 <style scoped>
 .navbar {
-  height: 50px;
+  height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  padding: 0 22px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(21, 59, 69, 0.08);
 }
 
 .navbar-left {
@@ -96,33 +97,42 @@ function toggleFullscreen() {
 .hamburger {
   font-size: 20px;
   cursor: pointer;
-  color: #5a5e66;
+  color: #42616a;
 }
 
 .hamburger:hover {
-  color: #409eff;
+  color: #0f7490;
 }
 
 .navbar-action {
   font-size: 18px;
-  color: #5a5e66;
+  color: #42616a;
   cursor: pointer;
-  padding: 0 8px;
+  padding: 8px;
+  border-radius: 8px;
 }
 
 .navbar-action:hover {
-  color: #409eff;
+  color: #0f7490;
+  background: #eaf6f6;
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 999px;
+  transition: background .2s ease;
+}
+
+.user-info:hover {
+  background: #eef6f7;
   cursor: pointer;
 }
 
 .username {
   font-size: 14px;
-  color: #5a5e66;
+  color: #35565f;
 }
 </style>

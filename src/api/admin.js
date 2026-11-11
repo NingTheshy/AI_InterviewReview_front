@@ -32,8 +32,8 @@ export function getAdminExperienceList(params) {
   return request.get('/admin/experiences', { params })
 }
 
-export function setExperienceStatus(token, data) {
-  return request.put(`/admin/experiences/${token}/status`, data)
+export function setExperienceStatus(id, data) {
+  return request.put(`/admin/experiences/${id}/status`, data)
 }
 
 // ========== 评论管理 ==========
@@ -43,4 +43,9 @@ export function getAdminCommentList(params) {
 
 export function deleteAdminComment(id) {
   return request.delete(`/admin/comments/${id}`)
+}
+
+// ========== 审计日志 ==========
+export function getAuditLogList(params) {
+  return request.get('/admin/audit-logs', { params })
 }

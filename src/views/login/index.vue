@@ -21,8 +21,7 @@ const loginRules = {
     { required: true, message: '请输入用户名或邮箱', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少6位', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' }
   ]
 }
 
@@ -105,26 +104,51 @@ function goRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 14%, rgba(117, 224, 211, 0.28), transparent 25rem),
+    radial-gradient(circle at 82% 82%, rgba(15, 116, 144, 0.42), transparent 30rem),
+    linear-gradient(135deg, #062c38 0%, #0d5262 54%, #08727c 100%);
 }
 
+.login-container::before,
+.login-container::after {
+  content: '';
+  position: absolute;
+  border: 1px solid rgba(219, 255, 252, 0.14);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.login-container::before { width: 32rem; height: 32rem; top: -16rem; right: -8rem; }
+.login-container::after { width: 22rem; height: 22rem; bottom: -12rem; left: -8rem; }
+
 .login-card {
-  width: 400px;
-  padding: 40px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+  width: min(400px, calc(100% - 32px));
+  padding: 42px 40px 36px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(2, 31, 39, 0.3);
 }
 
 .login-title {
   text-align: center;
   margin-bottom: 30px;
-  color: #303133;
-  font-size: 24px;
+  color: #143c47;
+  font-size: 26px;
+  letter-spacing: 0.03em;
 }
+
+.login-card :deep(.el-input__wrapper) { min-height: 44px; border-radius: 10px; background: #f7fbfb; }
+.login-card :deep(.el-button--primary) { min-height: 44px; border-radius: 10px; }
 
 .login-footer {
   text-align: center;
   margin-top: -8px;
+  color: #658087;
 }
 </style>

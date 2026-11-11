@@ -21,10 +21,10 @@ function getAffixTags() {
   const tags = []
   // admin 首页
   tags.push({
-    path: '/admin/stats',
+    path: '/management/stats',
     name: 'AdminStats',
     meta: { title: '首页' },
-    fullPath: '/admin/stats'
+    fullPath: '/management/stats'
   })
   return tags
 }
@@ -61,7 +61,7 @@ function closeSelectedTag(view) {
     if (lastView) {
       router.push(lastView.fullPath || lastView.path)
     } else {
-      router.push('/admin/stats')
+      router.push('/management/stats')
     }
   }
 }
@@ -80,7 +80,7 @@ function closeOthersTags() {
 // 关闭所有标签
 function closeAllTags() {
   visitedViews.value = visitedViews.value.filter(v => v.meta?.title === '首页')
-  router.push('/admin/stats')
+  router.push('/management/stats')
 }
 
 // 刷新当前标签

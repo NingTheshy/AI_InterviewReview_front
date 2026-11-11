@@ -46,7 +46,7 @@ service.interceptors.response.use(
           removeToken()
           router.push('/login')
         })
-      } else {
+      } else if (!response.config.skipErrorMessage) {
         ElMessage.error(res.message || '请求失败')
       }
 
@@ -58,25 +58,29 @@ service.interceptors.response.use(
   error => {
     NProgress.done()
 
+    if (error.config?.skipErrorMessage) {
+      return Promise.reject(error)
+    }
     if (error.response) {
-      const { status } = error.response
+      const { status, data } = error.response
+      const message = data?.message || error.message || '请求失败'
       switch (status) {
         case 401:
-          ElMessage.error('未授权，请登录')
+          ElMessage.error(message || '未授权，请登录')
           removeToken()
           router.push('/login')
           break
         case 403:
-          ElMessage.error('拒绝访问')
+          ElMessage.error(message || '拒绝访问')
           break
         case 404:
-          ElMessage.error('请求地址不存在')
+          ElMessage.error(message || '请求地址不存在')
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          ElMessage.error(message || '服务器内部错误')
           break
         default:
-          ElMessage.error(error.message || '网络错误')
+          ElMessage.error(message)
       }
     } else {
       ElMessage.error('网络连接异常')

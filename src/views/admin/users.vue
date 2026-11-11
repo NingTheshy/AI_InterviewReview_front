@@ -68,15 +68,16 @@ async function handleToggleStatus(row) {
 }
 
 async function handleChangeRole(row) {
-  const newRole = row.role === 1 ? 0 : 1
-  const roleLabel = newRole === 1 ? '管理员' : '普通用户'
+  const hasAdminRole = (row.roles || []).includes('admin')
+  const nextRoles = hasAdminRole ? ['user'] : ['user', 'admin']
+  const roleLabel = hasAdminRole ? '普通用户' : '管理员（同时保留 USER）'
   try {
     await ElMessageBox.confirm(`确定将「${row.username}」的角色修改为${roleLabel}吗？`, '确认', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await updateUserRole(row.id, { role: newRole })
+    await updateUserRole(row.id, { roles: nextRoles })
     ElMessage.success('角色修改成功')
     fetchList()
   } catch (error) {
@@ -134,8 +135,14 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="角色" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.role === 1 ? 'danger' : 'info'" size="small">
-              {{ row.role === 1 ? '管理员' : '普通用户' }}
+            <el-tag
+              v-for="role in (row.roles || [])"
+              :key="role"
+              :type="role === 'admin' ? 'danger' : 'info'"
+              size="small"
+              style="margin-right: 4px"
+            >
+              {{ role === 'admin' ? '管理员' : role === 'user' ? '普通用户' : role }}
             </el-tag>
           </template>
         </el-table-column>
@@ -156,14 +163,15 @@ onMounted(() => {
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button
+              v-permission="'user:status:update'"
               :type="row.status === 1 ? 'danger' : 'success'"
               link size="small"
               @click="handleToggleStatus(row)"
             >
               {{ row.status === 1 ? '禁用' : '启用' }}
             </el-button>
-            <el-button type="primary" link size="small" @click="handleChangeRole(row)">
-              {{ row.role === 1 ? '设为用户' : '设为管理员' }}
+            <el-button v-permission="'user:role:assign'" type="primary" link size="small" @click="handleChangeRole(row)">
+              {{ (row.roles || []).includes('admin') ? '移除管理员' : '设为管理员' }}
             </el-button>
           </template>
         </el-table-column>

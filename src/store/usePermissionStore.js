@@ -8,26 +8,31 @@ export const usePermissionStore = defineStore('permission', () => {
   const addRoutes = ref([])
   const routesGenerated = ref(false)
 
-  // 根据角色过滤路由
-  function filterRoutesByRole(routes, isAdmin) {
-    return routes.filter(route => {
-      if (route.meta?.roles && route.meta.roles.length > 0) {
-        return isAdmin
-      }
-      return true
-    }).map(route => {
+  // 后端 profile 返回的权限码是前端可见性判断的唯一数据来源。
+  function filterRoutesByAccess(routeList, userInfo) {
+    const roles = userInfo?.roles || []
+    const permissions = userInfo?.permissions || []
+
+    return routeList.reduce((result, route) => {
+      const requiredRoles = route.meta?.roles || []
+      const requiredPermissions = route.meta?.permissions || []
+      const roleAllowed = requiredRoles.length === 0 || requiredRoles.some(role => roles.includes(role))
+      const permissionAllowed = requiredPermissions.length === 0
+        || requiredPermissions.some(permission => permissions.includes(permission))
+      if (!roleAllowed || !permissionAllowed) return result
+
+      const nextRoute = { ...route }
       if (route.children) {
-        return {
-          ...route,
-          children: filterRoutesByRole(route.children, isAdmin)
-        }
+        nextRoute.children = filterRoutesByAccess(route.children, userInfo)
+        if (nextRoute.children.length === 0) return result
       }
-      return route
-    })
+      result.push(nextRoute)
+      return result
+    }, [])
   }
 
   // Actions
-  function generateRoutes(isAdmin = false) {
+  function generateRoutes(userInfo = {}) {
     const allRoutes = [
       {
         path: '/',
@@ -38,25 +43,25 @@ export const usePermissionStore = defineStore('permission', () => {
             path: 'interviews',
             name: 'InterviewList',
             component: () => import('@/views/interview/index.vue'),
-            meta: { title: '面试列表', icon: 'List' }
+            meta: { title: '面试列表', icon: 'List', permissions: ['interview:read'] }
           },
           {
             path: 'interview/upload',
             name: 'InterviewUpload',
             component: () => import('@/views/interview/upload.vue'),
-            meta: { title: '上传面试', icon: 'Upload' }
+            meta: { title: '创建面试', icon: 'Upload', permissions: ['interview:create'] }
           },
           {
             path: 'interview/:id',
             name: 'InterviewDetail',
             component: () => import('@/views/interview/detail.vue'),
-            meta: { title: '面试详情', icon: 'View', hidden: true }
+            meta: { title: '面试详情', icon: 'View', hidden: true, permissions: ['interview:read'] }
           },
           {
             path: 'favorites',
             name: 'Favorites',
             component: () => import('@/views/favorites/index.vue'),
-            meta: { title: '我的收藏', icon: 'Star' }
+            meta: { title: '我的收藏', icon: 'Star', permissions: ['favorite:manage'] }
           },
           {
             path: 'profile',
@@ -68,52 +73,58 @@ export const usePermissionStore = defineStore('permission', () => {
       },
       // 管理员路由
       {
-        path: '/admin',
+        path: '/management',
         component: () => import('@/layout/index.vue'),
-        redirect: '/admin/users',
-        meta: { roles: ['admin'] },
+        redirect: '/management/users',
+        meta: { title: '管理中心', icon: 'Tools' },
         children: [
           {
             path: 'users',
             name: 'AdminUsers',
             component: () => import('@/views/admin/users.vue'),
-            meta: { title: '用户管理', icon: 'UserFilled', roles: ['admin'] }
+            meta: { title: '用户管理', icon: 'UserFilled', permissions: ['user:read'] }
           },
           {
             path: 'interviews',
             name: 'AdminInterviews',
             component: () => import('@/views/admin/interviews.vue'),
-            meta: { title: '面试管理', icon: 'Document', roles: ['admin'] }
+            meta: { title: '面试管理', icon: 'Document', permissions: ['interview:read_all'] }
           },
           {
             path: 'experiences',
             name: 'AdminExperiences',
             component: () => import('@/views/admin/experiences.vue'),
-            meta: { title: '经验管理', icon: 'ChatDotRound', roles: ['admin'] }
+            meta: { title: '经验管理', icon: 'ChatDotRound', permissions: ['experience:read_all'] }
           },
           {
             path: 'comments',
             name: 'AdminComments',
             component: () => import('@/views/admin/comments.vue'),
-            meta: { title: '评论管理', icon: 'ChatLineRound', roles: ['admin'] }
+            meta: { title: '评论管理', icon: 'ChatLineRound', permissions: ['comment:read_all'] }
           },
           {
             path: 'ai-config',
             name: 'AiConfig',
             component: () => import('@/views/admin/aiConfig.vue'),
-            meta: { title: 'AI配置', icon: 'Setting', roles: ['admin'] }
+            meta: { title: 'AI配置', icon: 'Setting', permissions: ['ai_config:read'] }
           },
           {
             path: 'stats',
             name: 'AdminStats',
             component: () => import('@/views/admin/stats.vue'),
-            meta: { title: '系统统计', icon: 'DataAnalysis', roles: ['admin'] }
+            meta: { title: '系统统计', icon: 'DataAnalysis', permissions: ['system:stats:read'] }
+          },
+          {
+            path: 'audit-logs',
+            name: 'AdminAuditLogs',
+            component: () => import('@/views/admin/auditLogs.vue'),
+            meta: { title: '审计日志', icon: 'Tickets', permissions: ['audit:read'] }
           }
         ]
       }
     ]
 
-    const accessedRoutes = filterRoutesByRole(allRoutes, isAdmin)
+    const accessedRoutes = filterRoutesByAccess(allRoutes, userInfo)
     addRoutes.value = accessedRoutes
     routes.value = constantRoutes.concat(accessedRoutes)
     return accessedRoutes
@@ -123,7 +134,19 @@ export const usePermissionStore = defineStore('permission', () => {
     routesGenerated.value = true
   }
 
-  function resetRoutes() {
+  function resetRoutes(router) {
+    const removeRouteTree = routeList => {
+      routeList.forEach(route => {
+        route.children && removeRouteTree(route.children)
+        if (route.name && router?.hasRoute(route.name)) {
+          router.removeRoute(route.name)
+        }
+      })
+    }
+    removeRouteTree(addRoutes.value)
+    if (router?.hasRoute('NotFoundCatchAll')) {
+      router.removeRoute('NotFoundCatchAll')
+    }
     routes.value = []
     addRoutes.value = []
     routesGenerated.value = false

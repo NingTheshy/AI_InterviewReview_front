@@ -14,6 +14,7 @@ function getScoreColor(score) {
   return '#f56c6c'
 }
 const tableData = ref([])
+const filters = reactive({ interviewId: '', minScore: null, maxScore: null, sortBy: 'createdAt' })
 const pagination = reactive({
   page: 1,
   size: 10,
@@ -23,7 +24,11 @@ const pagination = reactive({
 async function fetchList() {
   loading.value = true
   try {
-    const res = await getFavoriteList({ page: pagination.page, size: pagination.size })
+    const params = { page: pagination.page, size: pagination.size, sortBy: filters.sortBy }
+    if (filters.interviewId) params.interviewId = filters.interviewId
+    if (filters.minScore != null) params.minScore = filters.minScore
+    if (filters.maxScore != null) params.maxScore = filters.maxScore
+    const res = await getFavoriteList(params)
     tableData.value = res.data.records
     pagination.total = res.data.total
   } catch (error) {
@@ -36,6 +41,16 @@ async function fetchList() {
 function handlePageChange(page) {
   pagination.page = page
   fetchList()
+}
+
+function handleFilter() {
+  pagination.page = 1
+  fetchList()
+}
+
+function resetFilter() {
+  Object.assign(filters, { interviewId: '', minScore: null, maxScore: null, sortBy: 'createdAt' })
+  handleFilter()
 }
 
 function goInterview(id) {
@@ -78,7 +93,19 @@ onMounted(() => {
     <!-- 页面标题 -->
     <div class="page-header">
       <h1>⭐ 我的收藏</h1>
-      <p>收藏的题目和面试记录，方便随时回顾</p>
+      <p>按来源、评分和收藏时间回顾面试问题</p>
+    </div>
+
+    <div class="filter-card">
+      <el-input v-model="filters.interviewId" placeholder="来源面试 ID" clearable style="width: 150px" />
+      <el-input-number v-model="filters.minScore" :min="0" :max="100" placeholder="最低分" />
+      <el-input-number v-model="filters.maxScore" :min="0" :max="100" placeholder="最高分" />
+      <el-select v-model="filters.sortBy" style="width: 150px">
+        <el-option label="最近收藏" value="createdAt" />
+        <el-option label="评分从高到低" value="score" />
+      </el-select>
+      <el-button type="primary" @click="handleFilter">筛选</el-button>
+      <el-button @click="resetFilter">重置</el-button>
     </div>
 
     <!-- 收藏列表 -->
@@ -98,13 +125,15 @@ onMounted(() => {
         <div class="card-content" @click="goInterview(item.interviewId)">
           <div class="card-main">
             <h3 class="card-title">
-              {{ item.questionText || (item.questionId ? `第 ${item.questionId} 题` : '整场面试') }}
+              {{ item.questionText || `问题 ${item.questionId}` }}
+              <el-tag v-if="item.archived" type="info" size="small">已归档</el-tag>
             </h3>
             <p class="card-source" v-if="item.interviewTitle || item.companyName">
               来源：{{ item.interviewTitle || '面试' }}
               <span v-if="item.companyName"> · {{ item.companyName }}</span>
             </p>
             <p class="card-remark" v-if="item.remark">{{ item.remark }}</p>
+            <p class="card-reference" v-if="item.referenceAnswer">参考答案：{{ item.referenceAnswer }}</p>
           </div>
           <div class="card-right">
             <span class="card-score" v-if="item.score != null" :style="{ color: getScoreColor(item.score) }">
@@ -154,6 +183,26 @@ onMounted(() => {
   margin: 0;
   color: #909399;
   font-size: 14px;
+}
+
+.filter-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.card-reference {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: #606266;
+  font-size: 13px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* 卡片列表 */

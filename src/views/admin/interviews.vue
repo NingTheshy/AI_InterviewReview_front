@@ -6,13 +6,11 @@ const loading = ref(false)
 const tableData = ref([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 
-// 管理端面试状态映射（比用户端更细粒度）
 const statusMap = {
-  0: { label: '待处理', type: 'info' },
-  1: { label: '转写中', type: 'primary' },
-  2: { label: '分析中', type: 'primary' },
-  3: { label: '已完成', type: 'success' },
-  4: { label: '失败', type: 'danger' }
+  0: { label: '处理中', type: 'primary' },
+  1: { label: '已完成', type: 'success' },
+  2: { label: '失败', type: 'danger' },
+  3: { label: '已取消', type: 'info' }
 }
 
 async function fetchList() {

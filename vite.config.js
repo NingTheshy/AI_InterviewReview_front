@@ -20,15 +20,11 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true
       },
+      '/resumes': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
       '/favorites': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/shares': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/share': {
         target: 'http://localhost:8080',
         changeOrigin: true
       },
@@ -49,6 +45,10 @@ export default defineConfig({
         changeOrigin: true
       },
       '/files': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/asr-files': {
         target: 'http://localhost:8080',
         changeOrigin: true
       }

@@ -15,12 +15,6 @@ export const constantRoutes = [
     component: () => import('@/views/register/index.vue'),
     meta: { title: '注册', hidden: true }
   },
-  {
-    path: '/share/:token',
-    name: 'SharePage',
-    component: () => import('@/views/share/index.vue'),
-    meta: { title: '分享页', hidden: true }
-  },
   // 经验广场公开页面（无需登录）
   {
     path: '/experiences',
@@ -34,7 +28,7 @@ export const constantRoutes = [
         meta: { title: '经验广场', hidden: true }
       },
       {
-        path: ':token',
+        path: ':id',
         name: 'ExperienceDetailPublic',
         component: () => import('@/views/experience/detail.vue'),
         meta: { title: '经验详情', hidden: true }
@@ -46,10 +40,6 @@ export const constantRoutes = [
     name: 'NotFound',
     component: () => import('@/views/error/404.vue'),
     meta: { title: '404', hidden: true }
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/404'
   }
 ]
 

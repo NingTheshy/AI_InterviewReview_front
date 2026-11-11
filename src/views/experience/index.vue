@@ -69,8 +69,8 @@ function handleReset() {
   fetchList()
 }
 
-function goDetail(token) {
-  router.push(`/experiences/${token}`)
+function goDetail(id) {
+  router.push(`/experiences/${id}`)
 }
 
 function handlePageChange(page) {
@@ -152,9 +152,9 @@ onMounted(() => {
       <el-empty v-if="!loading && list.length === 0" description="暂无公开经验" />
       <div
         v-for="item in list"
-        :key="item.token"
+        :key="item.id"
         class="experience-card"
-        @click="goDetail(item.token)"
+        @click="goDetail(item.id)"
       >
         <div class="card-top">
           <el-tag v-if="item.interviewType" size="small" type="info" effect="plain" round>
@@ -172,7 +172,7 @@ onMounted(() => {
         <div class="card-footer">
           <span class="meta">📝 {{ item.questionCount || 0 }} 题</span>
           <span class="meta">👁️ {{ item.viewCount || 0 }} 浏览</span>
-          <span class="meta">{{ formatTime(item.createdAt) }}</span>
+          <span class="meta">{{ formatTime(item.publishedAt) }}</span>
         </div>
       </div>
     </div>
@@ -193,20 +193,39 @@ onMounted(() => {
 <style scoped>
 .experience-page {
   padding-bottom: 20px;
+  --accent: #0e758f;
 }
 
 /* Hero 区域 */
 .hero-section {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-  border-radius: 16px;
-  padding: 40px;
-  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(118deg, #123e4a 0%, #117883 55%, #45a778 100%);
+  border-radius: 20px;
+  padding: 42px;
+  margin-bottom: 24px;
   color: #fff;
+  box-shadow: 0 16px 32px rgba(22, 110, 105, 0.18);
 }
 
+.hero-section::after {
+  content: '';
+  position: absolute;
+  width: 270px;
+  height: 270px;
+  right: -72px;
+  top: -132px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 0 0 40px rgba(255,255,255,.05), 0 0 0 80px rgba(255,255,255,.03);
+}
+
+.hero-section > * { position: relative; z-index: 1; }
+
 .hero-title {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: clamp(26px, 3vw, 32px);
+  font-weight: 750;
+  letter-spacing: -0.02em;
   margin: 0 0 8px;
 }
 
@@ -227,8 +246,8 @@ onMounted(() => {
 }
 
 .hero-search .el-input :deep(.el-input__wrapper) {
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(0, 35, 42, 0.2);
 }
 
 /* 筛选栏 */
@@ -237,10 +256,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  padding: 12px 16px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(21, 59, 69, 0.07);
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(21, 59, 69, 0.05);
 }
 
 .filter-left {
@@ -258,23 +278,24 @@ onMounted(() => {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  gap: 18px;
   min-height: 200px;
 }
 
 .experience-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 20px;
   cursor: pointer;
   transition: all 0.25s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 6px 18px rgba(21, 59, 69, 0.05);
+  border: 1px solid rgba(21, 59, 69, 0.08);
 }
 
 .experience-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-5px);
+  box-shadow: 0 16px 28px rgba(15, 99, 115, 0.13);
+  border-color: rgba(15, 116, 144, 0.22);
 }
 
 .card-top {
@@ -296,7 +317,7 @@ onMounted(() => {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: #183d47;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -318,7 +339,7 @@ onMounted(() => {
   color: #909399;
   font-size: 12px;
   padding-top: 12px;
-  border-top: 1px solid #f2f3f5;
+  border-top: 1px solid #e8f0f1;
 }
 
 /* 分页 */
@@ -326,5 +347,13 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .hero-section { padding: 28px 22px; border-radius: 16px; }
+  .hero-search, .filter-bar, .filter-left { flex-direction: column; align-items: stretch; }
+  .hero-search :deep(.el-select), .filter-left :deep(.el-input) { width: 100% !important; }
+  .filter-bar { gap: 12px; }
+  .card-grid { grid-template-columns: 1fr; }
 }
 </style>

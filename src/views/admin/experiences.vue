@@ -32,7 +32,7 @@ function handleSizeChange(size) {
 }
 
 async function handleToggleStatus(row) {
-  const newStatus = row.isPublic === 1 ? 0 : 1
+  const newStatus = row.moderationStatus === 'NORMAL' ? 0 : 1
   const action = newStatus === 0 ? '下架' : '恢复'
   try {
     await ElMessageBox.confirm(`确定要${action}该经验吗？`, '确认', {
@@ -40,7 +40,7 @@ async function handleToggleStatus(row) {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await setExperienceStatus(row.shareToken, { isPublic: newStatus })
+    await setExperienceStatus(row.id, { isPublic: newStatus })
     ElMessage.success(`已${action}`)
     fetchList()
   } catch (error) {
@@ -76,28 +76,32 @@ onMounted(() => {
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="发布者" width="120" />
-        <el-table-column prop="shareToken" label="分享Token" min-width="200" show-overflow-tooltip />
-        <el-table-column label="状态" width="80">
+        <el-table-column prop="interviewId" label="面试ID" width="90" />
+        <el-table-column label="状态" min-width="180">
           <template #default="{ row }">
-            <el-tag :type="row.isPublic === 1 ? 'success' : 'info'" size="small">
-              {{ row.isPublic === 1 ? '公开' : '私密' }}
+            <el-tag :type="row.publishStatus === 'PUBLISHED' ? 'success' : 'info'" size="small">
+              {{ row.publishStatus === 'PUBLISHED' ? '已发布' : '已撤回' }}
+            </el-tag>
+            <el-tag :type="row.moderationStatus === 'BLOCKED' ? 'danger' : 'success'" size="small" style="margin-left: 4px">
+              {{ row.moderationStatus === 'BLOCKED' ? '违规下架' : '治理正常' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="viewCount" label="浏览" width="80" align="center">
           <template #default="{ row }">{{ row.viewCount || 0 }}</template>
         </el-table-column>
-        <el-table-column label="创建时间" width="160">
-          <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+        <el-table-column label="发布时间" width="160">
+          <template #default="{ row }">{{ formatTime(row.publishedAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button
-              :type="row.isPublic === 1 ? 'danger' : 'success'"
+              v-permission="'experience:manage'"
+              :type="row.moderationStatus === 'NORMAL' ? 'danger' : 'success'"
               link size="small"
               @click="handleToggleStatus(row)"
             >
-              {{ row.isPublic === 1 ? '下架' : '恢复' }}
+              {{ row.moderationStatus === 'NORMAL' ? '下架' : '解除下架' }}
             </el-button>
           </template>
         </el-table-column>

@@ -15,8 +15,11 @@ export const useUserStore = defineStore('user', () => {
   const username = computed(() => userInfo.value?.username || '')
   const nickname = computed(() => userInfo.value?.nickname || '')
   const avatar = computed(() => userInfo.value?.avatar || '')
-  const role = computed(() => userInfo.value?.role ?? 0)
-  const isAdmin = computed(() => role.value === 1)
+  const roles = computed(() => userInfo.value?.roles || [])
+  const permissions = computed(() => userInfo.value?.permissions || [])
+  const isAdmin = computed(() => roles.value.includes('admin'))
+  const hasPermission = permission => permissions.value.includes(permission)
+  const hasAnyPermission = required => required.some(hasPermission)
 
   // Actions
   async function login(loginData) {
@@ -50,12 +53,13 @@ export const useUserStore = defineStore('user', () => {
     removeToken()
     // 清理动态路由
     const permissionStore = usePermissionStore()
-    permissionStore.resetRoutes()
+    permissionStore.resetRoutes(router)
   }
 
   return {
     token, userInfo,
-    isLoggedIn, username, nickname, avatar, role, isAdmin,
+    isLoggedIn, username, nickname, avatar, roles, permissions, isAdmin,
+    hasPermission, hasAnyPermission,
     login, fetchUserInfo, logout, reset
   }
 })

@@ -1,13 +1,17 @@
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { uploadInterview } from '@/api/interview'
+import { getResumeList, getResumeDetail, uploadResume, retryResume, deleteResume } from '@/api/resume'
 
 const router = useRouter()
 
 const formRef = ref(null)
 const loading = ref(false)
+const resumeLoading = ref(false)
+const resumes = ref([])
+let resumePollTimer = null
 
 // 表单数据
 const form = reactive({
@@ -16,12 +20,11 @@ const form = reactive({
   positionTitle: '',
   industry: '',
   interviewType: '',
-  jdText: ''
+  jdText: '',
+  resumeId: null
 })
 
-// 文件列表
 const audioFile = ref(null)
-const resumeFile = ref(null)
 
 // 面试类型选项
 const interviewTypeOptions = [
@@ -33,9 +36,10 @@ const interviewTypeOptions = [
 
 // 表单验证规则
 const formRules = {
-  jdText: [
-    { required: true, message: '请输入岗位JD', trigger: 'blur' }
-  ]
+  resumeId: [{ required: true, message: '请选择解析成功的简历', trigger: 'change' }],
+  positionTitle: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
+  interviewType: [{ required: true, message: '请选择面试类型', trigger: 'change' }],
+  jdText: [{ required: true, message: '请输入岗位JD', trigger: 'blur' }]
 }
 
 // 音频文件校验
@@ -49,9 +53,9 @@ function handleAudioChange(uploadFile, uploadFiles) {
     if (idx > -1) uploadFiles.splice(idx, 1)
     return
   }
-  const isLt200M = file.size / 1024 / 1024 < 200
-  if (!isLt200M) {
-    ElMessage.error('音频文件大小不能超过 200MB')
+  const isWithin2GB = file.size <= 2 * 1024 * 1024 * 1024
+  if (!isWithin2GB) {
+    ElMessage.error('音频文件大小不能超过 2GB')
     const idx = uploadFiles.indexOf(uploadFile)
     if (idx > -1) uploadFiles.splice(idx, 1)
     return
@@ -63,8 +67,7 @@ function handleAudioChange(uploadFile, uploadFiles) {
   audioFile.value = file
 }
 
-// 简历文件校验
-function handleResumeChange(uploadFile, uploadFiles) {
+async function handleResumeChange(uploadFile, uploadFiles) {
   const file = uploadFile.raw
   const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf')
   if (!isPDF) {
@@ -81,11 +84,16 @@ function handleResumeChange(uploadFile, uploadFiles) {
     if (idx > -1) uploadFiles.splice(idx, 1)
     return
   }
-  // 只保留最新选择的文件
-  if (uploadFiles.length > 1) {
-    uploadFiles.splice(0, uploadFiles.length - 1)
+  resumeLoading.value = true
+  try {
+    const res = await uploadResume(file)
+    ElMessage.success('简历已上传，正在解析')
+    await fetchResumes()
+    if (res.data?.id) startResumePolling(res.data.id)
+  } finally {
+    resumeLoading.value = false
+    uploadFiles.splice(0, uploadFiles.length)
   }
-  resumeFile.value = file
 }
 
 // 移除文件
@@ -93,8 +101,53 @@ function removeAudioFile() {
   audioFile.value = null
 }
 
-function removeResumeFile() {
-  resumeFile.value = null
+async function fetchResumes() {
+  const res = await getResumeList()
+  resumes.value = res.data || []
+  if (form.resumeId && !resumes.value.some(item => item.id === form.resumeId && item.parseStatus === 1)) {
+    form.resumeId = null
+  }
+}
+
+function startResumePolling(resumeId) {
+  stopResumePolling()
+  resumePollTimer = setInterval(async () => {
+    try {
+      const res = await getResumeDetail(resumeId)
+      await fetchResumes()
+      if (res.data.parseStatus === 1) {
+        form.resumeId = res.data.id
+        ElMessage.success('简历解析成功，已自动选中')
+        stopResumePolling()
+      } else if (res.data.parseStatus === 2) {
+        ElMessage.error(res.data.parseError || '简历解析失败')
+        stopResumePolling()
+      }
+    } catch {
+      stopResumePolling()
+    }
+  }, 2000)
+}
+
+function stopResumePolling() {
+  if (resumePollTimer) clearInterval(resumePollTimer)
+  resumePollTimer = null
+}
+
+async function handleRetryResume(item) {
+  await retryResume(item.id)
+  ElMessage.success('已重新提交解析')
+  await fetchResumes()
+  startResumePolling(item.id)
+}
+
+async function handleDeleteResume(item) {
+  await ElMessageBox.confirm(`确定从简历库隐藏「${item.originalName}」吗？`, '隐藏简历', {
+    type: 'warning'
+  })
+  await deleteResume(item.id)
+  if (form.resumeId === item.id) form.resumeId = null
+  await fetchResumes()
 }
 
 // 提交表单
@@ -109,21 +162,16 @@ async function handleSubmit() {
     ElMessage.error('请上传面试音频文件')
     return
   }
-  if (!resumeFile.value) {
-    ElMessage.error('请上传简历文件')
-    return
-  }
-
   const formData = new FormData()
   formData.append('audioFile', audioFile.value)
-  formData.append('resumeFile', resumeFile.value)
+  formData.append('resumeId', String(form.resumeId))
   formData.append('jdText', form.jdText)
+  formData.append('positionTitle', form.positionTitle)
+  formData.append('interviewType', form.interviewType)
 
   if (form.title) formData.append('title', form.title)
   if (form.companyName) formData.append('companyName', form.companyName)
-  if (form.positionTitle) formData.append('positionTitle', form.positionTitle)
   if (form.industry) formData.append('industry', form.industry)
-  if (form.interviewType) formData.append('interviewType', form.interviewType)
 
   loading.value = true
   try {
@@ -140,6 +188,14 @@ async function handleSubmit() {
 function handleCancel() {
   router.push('/interviews')
 }
+
+function formatFileSize(size) {
+  if (!size) return '--'
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+onMounted(fetchResumes)
+onBeforeUnmount(stopResumePolling)
 </script>
 
 <template>
@@ -150,8 +206,8 @@ function handleCancel() {
         <el-icon><ArrowLeft /></el-icon>
         返回列表
       </el-button>
-      <h1>上传面试</h1>
-      <p>上传面试音频和简历，AI 将自动分析并生成详细的复盘报告</p>
+      <h1>创建面试复盘</h1>
+      <p>选择已解析简历并上传面试音频，AI 将生成带时间轴的复盘报告</p>
     </div>
 
     <el-form
@@ -165,8 +221,8 @@ function handleCancel() {
         <div class="step-header">
           <span class="step-num">1</span>
           <div>
-            <h3>上传文件</h3>
-            <p>上传面试音频和你的简历文件</p>
+            <h3>准备分析材料</h3>
+            <p>音频与简历分开管理；只有解析成功的简历可以创建面试</p>
           </div>
         </div>
         <div class="step-body">
@@ -184,7 +240,7 @@ function handleCancel() {
                   <div class="upload-inner" v-if="!audioFile">
                     <el-icon class="upload-icon"><Microphone /></el-icon>
                     <div class="upload-text">拖拽或点击上传面试音频</div>
-                    <div class="upload-hint">支持 MP3 / WAV，最大 200MB</div>
+                    <div class="upload-hint">支持 MP3 / WAV，最大 2GB、最长 2 小时</div>
                   </div>
                   <div class="upload-inner uploaded" v-else>
                     <el-icon class="upload-icon success"><CircleCheck /></el-icon>
@@ -195,26 +251,51 @@ function handleCancel() {
               </div>
             </el-col>
             <el-col :span="12">
-              <div class="upload-area" :class="{ 'has-file': resumeFile }">
+              <div class="resume-library" v-loading="resumeLoading">
+                <el-form-item label="选择简历" prop="resumeId">
+                  <el-select v-model="form.resumeId" placeholder="请选择解析成功的简历" style="width: 100%">
+                    <el-option
+                      v-for="item in resumes"
+                      :key="item.id"
+                      :label="`${item.originalName} · ${formatFileSize(item.fileSize)}`"
+                      :value="item.id"
+                      :disabled="item.parseStatus !== 1"
+                    >
+                      <div class="resume-option">
+                        <span>{{ item.originalName }}</span>
+                        <el-tag v-if="item.parseStatus === 0" size="small">解析中</el-tag>
+                        <el-tag v-else-if="item.parseStatus === 1" size="small" type="success">可用</el-tag>
+                        <el-tag v-else size="small" type="danger">解析失败</el-tag>
+                      </div>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+
                 <el-upload
                   :auto-upload="false"
                   :limit="1"
+                  :show-file-list="false"
                   :on-change="handleResumeChange"
-                  :on-remove="removeResumeFile"
                   accept=".pdf"
-                  drag
                 >
-                  <div class="upload-inner" v-if="!resumeFile">
-                    <el-icon class="upload-icon"><Document /></el-icon>
-                    <div class="upload-text">拖拽或点击上传简历</div>
-                    <div class="upload-hint">支持 PDF，最大 20MB</div>
-                  </div>
-                  <div class="upload-inner uploaded" v-else>
-                    <el-icon class="upload-icon success"><CircleCheck /></el-icon>
-                    <div class="upload-text">{{ resumeFile.name }}</div>
-                    <div class="upload-hint">点击可重新选择</div>
-                  </div>
+                  <el-button :loading="resumeLoading">
+                    <el-icon><Upload /></el-icon>
+                    上传新简历
+                  </el-button>
                 </el-upload>
+
+                <div v-if="resumes.length" class="resume-status-list">
+                  <div v-for="item in resumes" :key="item.id" class="resume-status-item">
+                    <div>
+                      <strong>{{ item.originalName }}</strong>
+                      <small v-if="item.parseError">{{ item.parseError }}</small>
+                    </div>
+                    <div class="resume-actions">
+                      <el-button v-if="item.parseStatus === 2" text type="primary" @click="handleRetryResume(item)">重试</el-button>
+                      <el-button text type="danger" @click="handleDeleteResume(item)">隐藏</el-button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </el-col>
           </el-row>
@@ -226,8 +307,8 @@ function handleCancel() {
         <div class="step-header">
           <span class="step-num">2</span>
           <div>
-            <h3>基本信息 <span class="optional">选填</span></h3>
-            <p>填写面试的基本信息，方便后续查找和管理</p>
+            <h3>面试信息</h3>
+            <p>岗位和面试类型为必填；标题留空时由系统自动生成</p>
           </div>
         </div>
         <div class="step-body">
@@ -245,7 +326,7 @@ function handleCancel() {
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="职位名称">
+              <el-form-item label="职位名称" prop="positionTitle">
                 <el-input v-model="form.positionTitle" placeholder="如：后端开发工程师" maxlength="50" />
               </el-form-item>
             </el-col>
@@ -255,13 +336,13 @@ function handleCancel() {
               </el-form-item>
             </el-col>
           </el-row>
-          <el-form-item label="面试类型">
+          <el-form-item label="面试类型" prop="interviewType">
             <div class="type-options">
               <div
                 v-for="item in interviewTypeOptions"
                 :key="item.value"
                 :class="['type-option', { active: form.interviewType === item.value }]"
-                @click="form.interviewType = form.interviewType === item.value ? '' : item.value"
+                @click="form.interviewType = item.value"
               >
                 <el-icon><component :is="item.icon" /></el-icon>
                 <span>{{ item.label }}</span>
@@ -438,6 +519,53 @@ function handleCancel() {
 .upload-hint {
   font-size: 12px;
   color: #909399;
+}
+
+.resume-library {
+  min-height: 164px;
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.resume-option,
+.resume-status-item,
+.resume-actions {
+  display: flex;
+  align-items: center;
+}
+
+.resume-option,
+.resume-status-item {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resume-status-list {
+  margin-top: 12px;
+  max-height: 116px;
+  overflow: auto;
+}
+
+.resume-status-item {
+  padding: 8px 0;
+  border-top: 1px solid #ebeef5;
+  font-size: 12px;
+}
+
+.resume-status-item strong,
+.resume-status-item small {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-status-item small {
+  margin-top: 3px;
+  color: #f56c6c;
 }
 
 /* 面试类型选择 */

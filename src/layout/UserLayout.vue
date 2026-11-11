@@ -32,7 +32,7 @@ function handleCommand(command) {
       router.push('/profile')
       break
     case 'admin':
-      router.push('/admin')
+      router.push('/management')
       break
     case 'logout':
       userStore.logout()
@@ -110,7 +110,9 @@ function goLogin() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(91, 196, 194, 0.16), transparent 28rem),
+    #f4f7f8;
 }
 
 /* 顶部导航 */
@@ -118,17 +120,17 @@ function goLogin() {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(21, 59, 69, 0.08);
+  box-shadow: 0 4px 18px rgba(21, 59, 69, 0.05);
 }
 
 .nav-inner {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 0 24px;
-  height: 60px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -137,7 +139,7 @@ function goLogin() {
 .nav-left {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 46px;
 }
 
 .logo {
@@ -149,13 +151,20 @@ function goLogin() {
 }
 
 .logo-icon {
-  font-size: 24px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  font-size: 18px;
+  background: linear-gradient(135deg, #0d718d, #1ca3a7);
+  border-radius: 11px;
+  box-shadow: 0 6px 14px rgba(15, 116, 144, 0.2);
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #0b5d73, #13858b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -167,23 +176,23 @@ function goLogin() {
 }
 
 .nav-link {
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: #587078;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .nav-link:hover {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.06);
+  color: #0d718d;
+  background: rgba(15, 116, 144, 0.07);
 }
 
 .nav-link.active {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
+  color: #0d718d;
+  background: #e6f4f5;
   font-weight: 600;
 }
 
@@ -198,37 +207,37 @@ function goLogin() {
   gap: 8px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: 999px;
   transition: background 0.2s;
 }
 
 .user-avatar:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: #eef6f7;
 }
 
 .user-name {
   font-size: 14px;
-  color: #303133;
+  color: #28464e;
   font-weight: 500;
 }
 
 /* 内容区 */
 .main-content {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1240px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px 24px 40px;
 }
 
 /* 底部 */
 .site-footer {
   text-align: center;
   padding: 20px;
-  color: #909399;
+  color: #72878d;
   font-size: 13px;
-  border-top: 1px solid #ebeef5;
-  background: #fff;
+  border-top: 1px solid rgba(21, 59, 69, 0.08);
+  background: rgba(255, 255, 255, 0.74);
 }
 
 /* 过渡动画 */
@@ -240,5 +249,12 @@ function goLogin() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 760px) {
+  .nav-inner { height: 60px; padding: 0 16px; }
+  .nav-left { gap: 0; }
+  .logo-text, .nav-links, .user-name { display: none; }
+  .main-content { padding: 20px 16px 28px; }
 }
 </style>

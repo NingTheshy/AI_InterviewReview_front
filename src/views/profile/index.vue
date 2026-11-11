@@ -11,13 +11,15 @@ const userInfo = computed(() => userStore.userInfo)
 const profileFormRef = ref(null)
 const profileLoading = ref(false)
 const profileForm = reactive({
-  nickname: userInfo.value?.nickname || ''
+  nickname: userInfo.value?.nickname || '',
+  avatar: userInfo.value?.avatar || ''
 })
 
 const profileRules = {
   nickname: [
-    { max: 30, message: '昵称不超过30个字符', trigger: 'blur' }
-  ]
+    { max: 50, message: '昵称不超过50个字符', trigger: 'blur' }
+  ],
+  avatar: [{ max: 500, message: '头像链接不能超过500个字符', trigger: 'blur' }]
 }
 
 // 密码表单
@@ -61,8 +63,8 @@ async function handleUpdateProfile() {
 
   profileLoading.value = true
   try {
-    await updateProfile({ nickname: profileForm.nickname })
-    ElMessage.success('昵称修改成功')
+    await updateProfile({ nickname: profileForm.nickname, avatar: profileForm.avatar })
+    ElMessage.success('个人资料修改成功')
     await userStore.fetchUserInfo()
   } catch (error) {
     // 错误已在拦截器中处理
@@ -111,8 +113,15 @@ async function handleChangePassword() {
           <el-avatar :size="72" :src="userInfo?.avatar" icon="UserFilled" />
           <h3 class="user-name">{{ userInfo?.nickname || userInfo?.username }}</h3>
           <p class="user-email">{{ userInfo?.email }}</p>
-          <el-tag :type="userInfo?.role === 1 ? 'danger' : 'info'" size="small" effect="plain" round>
-            {{ userInfo?.role === 1 ? '管理员' : '普通用户' }}
+          <el-tag
+            v-for="role in (userInfo?.roles || [])"
+            :key="role"
+            :type="role === 'admin' ? 'danger' : 'info'"
+            size="small"
+            effect="plain"
+            round
+          >
+            {{ role === 'admin' ? '管理员' : role === 'user' ? '普通用户' : role }}
           </el-tag>
         </div>
       </div>
@@ -121,7 +130,7 @@ async function handleChangePassword() {
       <div class="profile-main">
         <!-- 修改昵称 -->
         <div class="form-card">
-          <h3 class="form-title">修改昵称</h3>
+          <h3 class="form-title">修改个人资料</h3>
           <el-form
             ref="profileFormRef"
             :model="profileForm"
@@ -131,6 +140,9 @@ async function handleChangePassword() {
           >
             <el-form-item label="昵称" prop="nickname">
               <el-input v-model="profileForm.nickname" placeholder="请输入昵称" />
+            </el-form-item>
+            <el-form-item label="头像 URL" prop="avatar">
+              <el-input v-model="profileForm.avatar" placeholder="https://example.com/avatar.png" />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="profileLoading" @click="handleUpdateProfile">
@@ -184,14 +196,14 @@ async function handleChangePassword() {
 
 .page-header h1 {
   margin: 0 0 6px;
-  font-size: 24px;
-  font-weight: 700;
-  color: #303133;
+  font-size: 26px;
+  font-weight: 750;
+  color: #183d47;
 }
 
 .page-header p {
   margin: 0;
-  color: #909399;
+  color: #71878d;
   font-size: 14px;
 }
 
@@ -199,44 +211,52 @@ async function handleChangePassword() {
 .profile-grid {
   display: grid;
   grid-template-columns: 240px 1fr;
-  gap: 20px;
+  gap: 22px;
 }
 
 /* 用户卡片 */
 .user-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 32px 20px;
   text-align: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(21, 59, 69, 0.08);
+  box-shadow: 0 10px 24px rgba(21, 59, 69, 0.06);
 }
 
 .user-name {
   margin: 16px 0 4px;
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: #183d47;
 }
 
 .user-email {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #909399;
+  color: #71878d;
 }
 
 /* 表单卡片 */
 .form-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(21, 59, 69, 0.08);
+  box-shadow: 0 10px 24px rgba(21, 59, 69, 0.06);
 }
 
 .form-title {
   margin: 0 0 20px;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: #183d47;
+}
+
+@media (max-width: 680px) {
+  .profile-grid { grid-template-columns: 1fr; }
+  .profile-sidebar { max-width: none; }
+  .user-card { padding: 24px 20px; }
 }
 </style>

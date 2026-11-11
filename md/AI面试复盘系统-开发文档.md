@@ -31,7 +31,7 @@
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Java | 17 LTS | 编程语言 |
-| Spring Boot | 3.2.5 | 后端框架 |
+| Spring Boot | 3.5.15 | 后端框架 |
 | Spring Security | 6.2.x | 安全认证 |
 | MyBatis-Plus | 3.5.5 | ORM 框架 |
 | MySQL | 8.0+ | 关系型数据库 |

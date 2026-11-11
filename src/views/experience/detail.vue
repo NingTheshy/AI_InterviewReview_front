@@ -44,7 +44,7 @@ function formatTime(time) {
 async function fetchDetail() {
   loading.value = true
   try {
-    const res = await getExperienceDetail(route.params.token)
+    const res = await getExperienceDetail(route.params.id)
     experience.value = res.data
     fetchComments()
   } catch (error) {
@@ -56,7 +56,7 @@ async function fetchDetail() {
 
 async function fetchComments() {
   try {
-    const res = await getExperienceComments(route.params.token, {
+    const res = await getExperienceComments(route.params.id, {
       page: commentPagination.page,
       size: commentPagination.size
     })
@@ -74,7 +74,7 @@ async function handleAddComment() {
   }
   commentLoading.value = true
   try {
-    await addComment(route.params.token, { content: commentText.value.trim() })
+    await addComment(route.params.id, { content: commentText.value.trim() })
     ElMessage.success('评论成功')
     commentText.value = ''
     commentPagination.page = 1
@@ -126,11 +126,13 @@ onMounted(() => {
           </div>
           <h1 class="hero-title">{{ experience.title || '经验详情' }}</h1>
           <div class="hero-meta">
+            <el-avatar :size="24" :src="experience.authorAvatar" />
+            <span>{{ experience.authorNickname || '匿名发布者' }}</span>
             <span v-if="experience.companyName">{{ experience.companyName }}</span>
             <span v-if="experience.positionTitle">{{ experience.positionTitle }}</span>
             <span v-if="experience.industry">{{ experience.industry }}</span>
             <span>👁️ {{ experience.viewCount || 0 }} 浏览</span>
-            <span>{{ formatTime(experience.createdAt) }}</span>
+            <span>{{ formatTime(experience.publishedAt) }}</span>
           </div>
         </div>
         <div class="hero-score" v-if="experience.overallScore != null">
@@ -141,6 +143,11 @@ onMounted(() => {
             {{ getScoreLabel(experience.overallScore) }}
           </div>
         </div>
+      </div>
+
+      <div class="section-card" v-if="experience.summaryMarkdown">
+        <h3 class="section-title">🧭 发布者经验总结</h3>
+        <div class="markdown-source">{{ experience.summaryMarkdown }}</div>
       </div>
 
       <!-- 维度评分 -->
@@ -224,6 +231,10 @@ onMounted(() => {
                 <h4>💡 改进建议</h4>
                 <p>{{ q.improvementTip }}</p>
               </div>
+              <div class="question-section" v-if="q.answerDifference">
+                <h4>🔎 关键差距</h4>
+                <p>{{ q.answerDifference }}</p>
+              </div>
               <div class="question-section ref" v-if="q.referenceAnswer">
                 <h4>📖 参考答案</h4>
                 <p>{{ q.referenceAnswer }}</p>
@@ -293,6 +304,12 @@ onMounted(() => {
 <style scoped>
 .experience-detail {
   padding-bottom: 40px;
+}
+
+.markdown-source {
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* 顶部信息卡片 */

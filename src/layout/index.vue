@@ -45,7 +45,8 @@ function handleOverlayClick() {
   width: 210px;
   height: 100vh;
   overflow: hidden;
-  transition: width 0.28s;
+  transition: width 0.28s cubic-bezier(.2,.8,.2,1);
+  box-shadow: 5px 0 24px rgba(7, 35, 43, 0.08);
 }
 
 .sidebar-collapsed .sidebar-container {
@@ -58,6 +59,7 @@ function handleOverlayClick() {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  background: #f4f7f8;
 }
 
 .drawer-bg {

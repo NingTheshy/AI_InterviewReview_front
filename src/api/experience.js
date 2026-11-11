@@ -6,18 +6,18 @@ export function getExperienceList(params) {
 }
 
 // 获取经验详情
-export function getExperienceDetail(token) {
-  return request.get(`/experiences/${token}`)
+export function getExperienceDetail(id) {
+  return request.get(`/experiences/${id}`)
 }
 
 // 获取经验评论列表
-export function getExperienceComments(token, params) {
-  return request.get(`/experiences/${token}/comments`, { params })
+export function getExperienceComments(id, params) {
+  return request.get(`/experiences/${id}/comments`, { params })
 }
 
 // 发表评论
-export function addComment(token, data) {
-  return request.post(`/experiences/${token}/comments`, data)
+export function addComment(id, data) {
+  return request.post(`/experiences/${id}/comments`, data)
 }
 
 // 删除评论

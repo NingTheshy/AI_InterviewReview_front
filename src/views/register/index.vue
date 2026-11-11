@@ -201,23 +201,47 @@ function goLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(117, 224, 211, 0.25), transparent 25rem),
+    radial-gradient(circle at 82% 82%, rgba(15, 116, 144, 0.4), transparent 30rem),
+    linear-gradient(135deg, #062c38 0%, #0d5262 54%, #08727c 100%);
 }
 
+.register-container::before,
+.register-container::after {
+  content: '';
+  position: absolute;
+  border: 1px solid rgba(219, 255, 252, 0.14);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.register-container::before { width: 34rem; height: 34rem; top: -17rem; right: -9rem; }
+.register-container::after { width: 21rem; height: 21rem; bottom: -10rem; left: -8rem; }
+
 .register-card {
-  width: 400px;
-  padding: 40px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+  width: min(400px, calc(100% - 32px));
+  padding: 36px 40px 32px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(2, 31, 39, 0.3);
 }
 
 .register-title {
   text-align: center;
-  margin-bottom: 30px;
-  color: #303133;
-  font-size: 24px;
+  margin-bottom: 26px;
+  color: #143c47;
+  font-size: 26px;
+  letter-spacing: 0.03em;
 }
+
+.register-card :deep(.el-input__wrapper) { min-height: 42px; border-radius: 10px; background: #f7fbfb; }
+.register-card :deep(.el-button--primary) { min-height: 42px; border-radius: 10px; }
 
 .code-row {
   display: flex;
@@ -232,5 +256,6 @@ function goLogin() {
 .register-footer {
   text-align: center;
   margin-top: -8px;
+  color: #658087;
 }
 </style>
