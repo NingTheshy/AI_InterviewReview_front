@@ -17,16 +17,11 @@ const affixTags = ref([])
 
 // 从路由配置中获取固定标签
 function getAffixTags() {
-  const routes = permissionStore.routes
-  const tags = []
-  // admin 首页
-  tags.push({
-    path: '/management/stats',
-    name: 'AdminStats',
-    meta: { title: '首页' },
-    fullPath: '/management/stats'
-  })
-  return tags
+  const children = permissionStore.routes.find(item => item.path === '/management')?.children || []
+  const home = children.find(item => item.path === 'stats') || children.find(item => !item.meta?.hidden)
+  if (!home) return []
+  const path = `/management/${home.path}`
+  return [{ path, name: home.name, meta: { title: home.meta?.title, affix: true }, fullPath: path }]
 }
 
 function isActive(tag) {
@@ -61,7 +56,7 @@ function closeSelectedTag(view) {
     if (lastView) {
       router.push(lastView.fullPath || lastView.path)
     } else {
-      router.push('/management/stats')
+      router.push(affixTags.value[0]?.path || '/')
     }
   }
 }
@@ -70,7 +65,7 @@ function closeSelectedTag(view) {
 function closeOthersTags() {
   if (!selectedTag.value) return
   visitedViews.value = visitedViews.value.filter(
-    v => v.meta?.title === '首页' || v.path === selectedTag.value.path
+    v => v.meta?.affix || v.path === selectedTag.value.path
   )
   if (!isActive(selectedTag.value)) {
     router.push(selectedTag.value.fullPath || selectedTag.value.path)
@@ -79,8 +74,8 @@ function closeOthersTags() {
 
 // 关闭所有标签
 function closeAllTags() {
-  visitedViews.value = visitedViews.value.filter(v => v.meta?.title === '首页')
-  router.push('/management/stats')
+  visitedViews.value = visitedViews.value.filter(v => v.meta?.affix)
+  router.push(affixTags.value[0]?.path || '/')
 }
 
 // 刷新当前标签
@@ -127,7 +122,8 @@ function loadViews() {
   const stored = sessionStorage.getItem('tagsView')
   if (stored) {
     try {
-      visitedViews.value = JSON.parse(stored)
+      const allowedPaths = new Set((permissionStore.routes.find(item => item.path === '/management')?.children || []).map(item => `/management/${item.path}`))
+      visitedViews.value = JSON.parse(stored).filter(item => allowedPaths.has(item.path))
     } catch (e) {
       visitedViews.value = []
     }
@@ -138,10 +134,11 @@ function loadViews() {
 onMounted(() => {
   affixTags.value = getAffixTags()
   loadViews()
-  // 确保固定标签存在
-  for (const tag of affixTags.value) {
-    addView(tag)
-  }
+  // 以当前权限生成的固定标签为准，避免旧会话的标签仍可关闭或指向无权限页面。
+  visitedViews.value = [
+    ...affixTags.value,
+    ...visitedViews.value.filter(view => !affixTags.value.some(tag => tag.path === view.path))
+  ]
   addVisitedView()
   // 点击其他区域关闭右键菜单
   document.addEventListener('click', closeContextMenu)
@@ -171,7 +168,7 @@ watch(visitedViews, () => {
       >
         {{ tag.meta?.title }}
         <el-icon
-          v-if="tag.meta?.title !== '首页'"
+          v-if="!tag.meta?.affix"
           class="tag-close"
           @click.prevent.stop="closeSelectedTag(tag)"
         >
@@ -188,7 +185,7 @@ watch(visitedViews, () => {
         class="contextmenu"
       >
         <li @click="refreshSelectedTag">刷新</li>
-        <li v-if="selectedTag?.meta?.title !== '首页'" @click="closeSelectedTag(selectedTag)">关闭</li>
+        <li v-if="!selectedTag?.meta?.affix" @click="closeSelectedTag(selectedTag)">关闭</li>
         <li @click="closeOthersTags">关闭其他</li>
         <li @click="closeAllTags">关闭所有</li>
       </ul>
@@ -199,10 +196,11 @@ watch(visitedViews, () => {
 <style scoped>
 .tags-view-container {
   height: 34px;
+  flex-shrink: 0;
   width: 100%;
   background: #fff;
   border-bottom: 1px solid #d8dce5;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(22, 50, 67, 0.04);
 }
 
 .tags-view-wrapper {
@@ -243,8 +241,8 @@ watch(visitedViews, () => {
 
 .tags-view-item.active {
   color: #fff;
-  background-color: #409eff;
-  border-color: #409eff;
+  background-color: #0f7490;
+  border-color: #0f7490;
 }
 
 .tag-close {

@@ -208,55 +208,79 @@ onMounted(() => {
 
 <template>
   <div class="admin-ai-config">
-    <el-card>
+    <div class="page-heading">
+      <div>
+        <div class="page-eyebrow">MODEL MANAGEMENT</div>
+        <h1>AI 配置</h1>
+        <p>管理语音识别与文本分析模型，测试连接后再设置默认配置。</p>
+      </div>
+      <el-button v-permission="'ai_config:manage'" type="primary" icon="Plus" @click="handleAdd">新增配置</el-button>
+    </div>
+
+    <el-card class="config-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>AI配置管理</span>
-          <el-button v-permission="'ai_config:manage'" type="primary" icon="Plus" @click="handleAdd">新增配置</el-button>
+          <div class="card-title-group">
+            <span class="card-title">配置列表</span>
+            <span class="record-count">共 {{ pagination.total }} 条</span>
+          </div>
+          <el-button text icon="Refresh" :loading="loading" @click="fetchList">刷新</el-button>
         </div>
       </template>
 
-      <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column label="类型" width="120">
+      <el-table :data="tableData" v-loading="loading" class="config-table" table-layout="fixed">
+        <el-table-column label="配置" min-width="230">
           <template #default="{ row }">
-            <el-tag :type="row.configType === 1 ? 'warning' : 'primary'" size="small">
-              {{ row.configType === 1 ? 'ASR' : 'LLM' }}
-            </el-tag>
+            <div class="config-name" :title="row.configName">{{ row.configName }}</div>
+            <div class="config-meta">
+              <el-tag :type="row.configType === 1 ? 'warning' : 'primary'" size="small" effect="plain">
+                {{ row.configType === 1 ? '语音识别' : '文本模型' }}
+              </el-tag>
+              <span>排序 {{ row.sortOrder ?? 0 }}</span>
+              <span v-if="row.status !== 1" class="disabled-label">已停用</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="configName" label="配置名称" width="150" />
-        <el-table-column prop="provider" label="提供商" width="120" />
-        <el-table-column prop="modelName" label="模型" width="150" />
-        <el-table-column label="测试状态" min-width="170">
+        <el-table-column label="模型" min-width="220">
           <template #default="{ row }">
-            <el-tag :type="row.testStatus === 1 ? 'success' : row.testStatus === 2 ? 'danger' : 'info'" size="small">
+            <div class="provider-name">{{ row.provider === 'dashscope' ? 'DashScope' : row.provider === 'deepseek' ? 'DeepSeek' : row.provider }}</div>
+            <div class="model-name" :title="row.modelName">{{ row.modelName }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="连接信息" min-width="250">
+          <template #default="{ row }">
+            <div class="endpoint" :title="row.apiEndpoint || ''">{{ row.apiEndpoint || '未填写请求地址' }}</div>
+            <div class="key-status">API Key · {{ row.apiKey || '未设置' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="连接测试" min-width="190">
+          <template #default="{ row }">
+            <el-tag :type="row.testStatus === 1 ? 'success' : row.testStatus === 2 ? 'danger' : 'info'" size="small" effect="light">
               {{ row.testStatus === 1 ? '测试成功' : row.testStatus === 2 ? '测试失败' : '未测试' }}
             </el-tag>
-            <div v-if="row.lastTestMessage" class="test-message">{{ row.lastTestMessage }}</div>
+            <div v-if="row.lastTestMessage" class="test-message" :title="row.lastTestMessage">{{ row.lastTestMessage }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="API Key" width="150">
-          <template #default="{ row }">{{ row.apiKey }}</template>
-        </el-table-column>
-        <el-table-column label="默认" width="80" align="center">
+        <el-table-column label="默认配置" width="104" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.isDefault === 1" type="success" size="small">默认</el-tag>
+            <el-tag v-if="row.isDefault === 1" type="success" size="small" effect="plain">当前默认</el-tag>
             <el-button v-else v-permission="'ai_config:manage'" type="primary" link size="small" :disabled="row.status !== 1 || row.testStatus !== 1" @click="handleSetDefault(row)">
               设为默认
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="sortOrder" label="排序" width="70" align="center" />
-        <el-table-column label="创建时间" width="160">
+        <el-table-column label="创建时间" width="166">
           <template #default="{ row }">
             {{ row.createdAt ? new Date(row.createdAt).toLocaleString() : '--' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="174" fixed="right" align="right" header-align="right">
           <template #default="{ row }">
-            <el-button v-permission="'ai_config:manage'" type="success" link size="small" @click="openTest(row)">测试</el-button>
-            <el-button v-permission="'ai_config:manage'" type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button v-permission="'ai_config:manage'" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <div class="row-actions">
+              <el-button v-permission="'ai_config:manage'" type="primary" link size="small" @click="openTest(row)">测试</el-button>
+              <el-button v-permission="'ai_config:manage'" type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button v-permission="'ai_config:manage'" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
         <template #empty>
@@ -278,7 +302,7 @@ onMounted(() => {
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="550px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="min(550px, 94vw)" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="配置类型" prop="configType">
           <el-select v-model="form.configType" style="width: 100%;">
@@ -318,7 +342,7 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="testDialogVisible" title="测试 DashScope ASR 配置" width="500px">
+    <el-dialog v-model="testDialogVisible" title="测试 DashScope ASR 配置" width="min(500px, 94vw)">
       <el-alert type="info" :closable="false" title="上传一段不超过 20MB 的 MP3/WAV，系统将执行临时上传、任务轮询和结果解析。" />
       <el-upload
         style="margin-top: 18px"
@@ -340,25 +364,54 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.admin-ai-config { max-width: 1800px; margin: 0 auto; }
+.page-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 0 0 20px; }
+.page-heading h1 { margin: 4px 0 5px; color: #203747; font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
+.page-heading p { margin: 0; color: #7c8c99; font-size: 13px; }
+.page-eyebrow { color: #1b8a8c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.config-card { border: 1px solid #e7edf2; border-radius: 8px; box-shadow: 0 5px 20px rgba(29, 56, 76, .04); }
+:deep(.config-card .el-card__header) { padding: 15px 20px; border-bottom-color: #edf1f5; }
+:deep(.config-card .el-card__body) { padding: 0 0 16px; }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+.card-title-group { display: flex; align-items: baseline; gap: 10px; }
+.card-title { color: #243a49; font-size: 15px; font-weight: 650; }
+.record-count { color: #97a5ae; font-size: 12px; }
+:deep(.config-table .el-table__header th) { background: #f8fafc; color: #647687; font-size: 12px; font-weight: 600; }
+:deep(.config-table .el-table__cell) { padding: 13px 0; }
+:deep(.config-table .el-table__row:hover td) { background: #f7fbfb !important; }
+.config-name { overflow: hidden; color: #223d4c; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.config-meta { display: flex; align-items: center; gap: 8px; margin-top: 7px; color: #94a3af; font-size: 11px; }
+.disabled-label { color: #c27a36; }
+.provider-name { color: #3c5261; font-size: 13px; font-weight: 600; }
+.model-name, .endpoint { overflow: hidden; margin-top: 5px; color: #70808e; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.model-name { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.endpoint { margin-top: 0; }
+.key-status { margin-top: 6px; color: #93a2ae; font-size: 11px; }
+.row-actions { display: flex; justify-content: flex-end; gap: 3px; white-space: nowrap; }
+.row-actions :deep(.el-button + .el-button) { margin-left: 0; }
 
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  padding: 16px 20px 0;
 }
 
 .test-message {
-  margin-top: 4px;
-  max-width: 180px;
+  margin-top: 6px;
   overflow: hidden;
-  color: #909399;
-  font-size: 12px;
+  color: #93a2ae;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .page-heading { align-items: flex-start; }
+  .page-heading h1 { font-size: 20px; }
+  .page-heading p { max-width: 220px; line-height: 1.5; }
+  .pagination-wrapper { overflow-x: auto; justify-content: flex-start; }
 }
 </style>

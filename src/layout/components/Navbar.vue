@@ -3,15 +3,23 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store/useAppStore'
 import { useUserStore } from '@/store/useUserStore'
+import { usePermissionStore } from '@/store/usePermissionStore'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const permissionStore = usePermissionStore()
 
 const sidebarOpened = computed(() => appStore.sidebarOpened)
 const username = computed(() => userStore.nickname || userStore.username)
 const avatar = computed(() => userStore.avatar)
+const homeRoute = computed(() => {
+  const children = permissionStore.routes.find(item => item.path === '/management')?.children || []
+  const first = children.find(item => item.path === 'stats') || children.find(item => !item.meta?.hidden)
+  return first ? { path: `/management/${first.path}`, title: first.meta?.title } : { path: '/', title: '首页' }
+})
 
 function toggleSidebar() {
   appStore.toggleSidebar()
@@ -45,8 +53,8 @@ function toggleFullscreen() {
         <Expand v-else />
       </el-icon>
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/management/stats' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item v-if="route.meta?.title">
+        <el-breadcrumb-item :to="{ path: homeRoute.path }">{{ homeRoute.title }}</el-breadcrumb-item>
+        <el-breadcrumb-item v-if="route.meta?.title && route.path !== homeRoute.path">
           {{ route.meta.title }}
         </el-breadcrumb-item>
       </el-breadcrumb>
@@ -61,7 +69,7 @@ function toggleFullscreen() {
       </el-tooltip>
       <el-dropdown @command="handleCommand">
         <div class="user-info">
-          <el-avatar :size="30" :src="avatar" icon="UserFilled" />
+          <UserAvatar :size="30" :avatar="avatar" />
           <span class="username">{{ username }}</span>
           <el-icon><ArrowDown /></el-icon>
         </div>
@@ -78,21 +86,24 @@ function toggleFullscreen() {
 
 <style scoped>
 .navbar {
-  height: 58px;
+  height: 56px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 22px;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(21, 59, 69, 0.08);
+  background: #fff;
+  border-bottom: 1px solid #e8edf1;
 }
 
 .navbar-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
+
+.navbar-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
 
 .hamburger {
   font-size: 20px;
@@ -134,5 +145,10 @@ function toggleFullscreen() {
 .username {
   font-size: 14px;
   color: #35565f;
+}
+@media (max-width: 768px) {
+  .navbar { padding: 0 14px; }
+  .navbar-right { display: flex; align-items: center; }
+  .username { display: none; }
 }
 </style>

@@ -12,45 +12,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/auth': {
+      '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/interviews': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/resumes': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/favorites': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/experiences': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/comments': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/ai-configs': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/admin': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/files': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/asr-files': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api(?=\/|$)/, '')
       }
     }
   }

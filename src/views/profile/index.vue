@@ -1,8 +1,9 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount } from 'vue'
 import { useUserStore } from '@/store/useUserStore'
-import { updateProfile, changePassword } from '@/api/auth'
+import { updateProfile, uploadAvatar, changePassword } from '@/api/auth'
 import { ElMessage } from 'element-plus'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
@@ -11,16 +12,54 @@ const userInfo = computed(() => userStore.userInfo)
 const profileFormRef = ref(null)
 const profileLoading = ref(false)
 const profileForm = reactive({
-  nickname: userInfo.value?.nickname || '',
-  avatar: userInfo.value?.avatar || ''
+  nickname: userInfo.value?.nickname || ''
 })
 
 const profileRules = {
-  nickname: [
-    { max: 50, message: '昵称不超过50个字符', trigger: 'blur' }
-  ],
-  avatar: [{ max: 500, message: '头像链接不能超过500个字符', trigger: 'blur' }]
+  nickname: [{ max: 50, message: '昵称不超过50个字符', trigger: 'blur' }]
 }
+
+const avatarFile = ref(null)
+const avatarPreviewUrl = ref('')
+const avatarLoading = ref(false)
+
+function clearPreview() {
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
+  avatarPreviewUrl.value = ''
+}
+
+function handleAvatarSelected(uploadFile) {
+  const file = uploadFile.raw
+  const name = file?.name?.toLowerCase() || ''
+  const valid = file && file.size <= 5 * 1024 * 1024
+    && ((file.type === 'image/jpeg' && /\.jpe?g$/.test(name))
+      || (file.type === 'image/png' && name.endsWith('.png')))
+  if (!valid) {
+    avatarFile.value = null
+    clearPreview()
+    ElMessage.error('请选择不超过 5 MB 的 JPG 或 PNG 图片')
+    return
+  }
+  clearPreview()
+  avatarFile.value = file
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+}
+
+async function handleAvatarUpload() {
+  if (!avatarFile.value) return
+  avatarLoading.value = true
+  try {
+    await uploadAvatar(avatarFile.value)
+    await userStore.fetchUserInfo()
+    avatarFile.value = null
+    clearPreview()
+    ElMessage.success('头像已更新')
+  } finally {
+    avatarLoading.value = false
+  }
+}
+
+onBeforeUnmount(clearPreview)
 
 // 密码表单
 const passwordFormRef = ref(null)
@@ -63,7 +102,7 @@ async function handleUpdateProfile() {
 
   profileLoading.value = true
   try {
-    await updateProfile({ nickname: profileForm.nickname, avatar: profileForm.avatar })
+    await updateProfile({ nickname: profileForm.nickname })
     ElMessage.success('个人资料修改成功')
     await userStore.fetchUserInfo()
   } catch (error) {
@@ -110,7 +149,8 @@ async function handleChangePassword() {
       <!-- 左侧：基本信息 -->
       <div class="profile-sidebar">
         <div class="user-card">
-          <el-avatar :size="72" :src="userInfo?.avatar" icon="UserFilled" />
+          <el-avatar v-if="avatarPreviewUrl" :size="72" :src="avatarPreviewUrl" />
+          <UserAvatar v-else :size="72" :avatar="userInfo?.avatar" />
           <h3 class="user-name">{{ userInfo?.nickname || userInfo?.username }}</h3>
           <p class="user-email">{{ userInfo?.email }}</p>
           <el-tag
@@ -141,15 +181,24 @@ async function handleChangePassword() {
             <el-form-item label="昵称" prop="nickname">
               <el-input v-model="profileForm.nickname" placeholder="请输入昵称" />
             </el-form-item>
-            <el-form-item label="头像 URL" prop="avatar">
-              <el-input v-model="profileForm.avatar" placeholder="https://example.com/avatar.png" />
-            </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="profileLoading" @click="handleUpdateProfile">
                 保存
               </el-button>
             </el-form-item>
           </el-form>
+        </div>
+
+        <div class="form-card">
+          <h3 class="form-title">更换头像</h3>
+          <p class="avatar-hint">选择 JPG 或 PNG 图片，最大 5 MB。上传后会自动裁成正方形。</p>
+          <div class="avatar-actions">
+            <el-upload :auto-upload="false" :show-file-list="false" accept="image/jpeg,image/png" :on-change="handleAvatarSelected">
+              <el-button>选择图片</el-button>
+            </el-upload>
+            <el-button type="primary" :disabled="!avatarFile" :loading="avatarLoading" @click="handleAvatarUpload">上传头像</el-button>
+          </div>
+          <p v-if="avatarFile" class="selected-file">已选择：{{ avatarFile.name }}</p>
         </div>
 
         <!-- 修改密码 -->
@@ -253,6 +302,9 @@ async function handleChangePassword() {
   font-weight: 600;
   color: #183d47;
 }
+.avatar-hint { margin: -6px 0 16px; color: #71878d; font-size: 13px; }
+.avatar-actions { display: flex; align-items: center; gap: 10px; }
+.selected-file { margin: 12px 0 0; color: #4e6c74; font-size: 12px; overflow-wrap: anywhere; }
 
 @media (max-width: 680px) {
   .profile-grid { grid-template-columns: 1fr; }

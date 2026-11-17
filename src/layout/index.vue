@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/store/useAppStore'
 import Sidebar from './components/Sidebar.vue'
 import Navbar from './components/Navbar.vue'
@@ -12,10 +12,14 @@ const sidebarOpened = computed(() => appStore.sidebarOpened)
 function handleOverlayClick() {
   appStore.closeSidebar()
 }
+
+onMounted(() => {
+  if (window.matchMedia('(max-width: 768px)').matches) appStore.closeSidebar()
+})
 </script>
 
 <template>
-  <div class="app-wrapper" :class="{ 'sidebar-collapsed': !sidebarOpened }">
+  <div class="app-wrapper admin-shell" :class="{ 'sidebar-collapsed': !sidebarOpened }">
     <!-- 移动端遮罩层 -->
     <div
       v-if="sidebarOpened"
@@ -42,11 +46,11 @@ function handleOverlayClick() {
 
 .sidebar-container {
   flex-shrink: 0;
-  width: 210px;
+  width: 218px;
   height: 100vh;
   overflow: hidden;
   transition: width 0.28s cubic-bezier(.2,.8,.2,1);
-  box-shadow: 5px 0 24px rgba(7, 35, 43, 0.08);
+  box-shadow: 2px 0 12px rgba(12, 31, 47, 0.1);
 }
 
 .sidebar-collapsed .sidebar-container {
@@ -59,7 +63,7 @@ function handleOverlayClick() {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
-  background: #f4f7f8;
+  background: #f5f7fa;
 }
 
 .drawer-bg {
@@ -67,6 +71,19 @@ function handleOverlayClick() {
 }
 
 @media screen and (max-width: 768px) {
+  .sidebar-container {
+    position: absolute;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 218px;
+  }
+
+  .sidebar-collapsed .sidebar-container {
+    width: 218px;
+    transform: translateX(-100%);
+  }
+
   .drawer-bg {
     display: block;
     position: fixed;

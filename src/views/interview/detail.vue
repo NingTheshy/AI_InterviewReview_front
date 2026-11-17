@@ -35,7 +35,7 @@ async function loadAudio(filePath) {
   if (!filePath) return
   audioLoading.value = true
   try {
-    const res = await axios.get(`/files/${filePath}`, {
+    const res = await axios.get(`${import.meta.env.VITE_APP_BASE_API || ''}/files/${encodeURIComponent(filePath)}`, {
       responseType: 'blob',
       headers: { Authorization: `Bearer ${getToken()}` }
     })

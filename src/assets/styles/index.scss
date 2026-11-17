@@ -77,3 +77,25 @@ html, body, #app {
 .el-dialog {
   border-color: rgba(24, 53, 61, 0.08);
 }
+
+/* 管理后台统一表格与卡片基线。 */
+.admin-shell .app-main .el-card {
+  border: 1px solid #e7edf2;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(29, 56, 76, 0.04);
+}
+
+.admin-shell .app-main .el-card__header {
+  border-bottom-color: #edf1f5;
+}
+
+.admin-shell .app-main .el-table__header th {
+  background: #f8fafc;
+  color: #647687;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-shell .app-main .el-table__row:hover td {
+  background: #f7fbfb !important;
+}

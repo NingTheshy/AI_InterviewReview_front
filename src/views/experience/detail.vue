@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getExperienceDetail, getExperienceComments, addComment, deleteComment } from '@/api/experience'
 import { useUserStore } from '@/store/useUserStore'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -126,7 +127,7 @@ onMounted(() => {
           </div>
           <h1 class="hero-title">{{ experience.title || '经验详情' }}</h1>
           <div class="hero-meta">
-            <el-avatar :size="24" :src="experience.authorAvatar" />
+            <UserAvatar :size="24" :avatar="experience.authorAvatar" />
             <span>{{ experience.authorNickname || '匿名发布者' }}</span>
             <span v-if="experience.companyName">{{ experience.companyName }}</span>
             <span v-if="experience.positionTitle">{{ experience.positionTitle }}</span>
@@ -270,7 +271,7 @@ onMounted(() => {
         <div class="comment-list">
           <div v-for="item in comments" :key="item.id" class="comment-item">
             <div class="comment-avatar">
-              <el-avatar :size="36" icon="UserFilled" />
+              <UserAvatar :size="36" :avatar="item.avatar" />
             </div>
             <div class="comment-body">
               <div class="comment-header">

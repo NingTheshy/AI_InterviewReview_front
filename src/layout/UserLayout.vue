@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/useUserStore'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,7 +71,7 @@ function goLogin() {
           <template v-if="isLoggedIn">
             <el-dropdown @command="handleCommand" trigger="click">
               <div class="user-avatar">
-                <el-avatar :size="32" :src="avatar" icon="UserFilled" />
+                <UserAvatar :size="32" :avatar="avatar" />
                 <span class="user-name">{{ username }}</span>
               </div>
               <template #dropdown>
