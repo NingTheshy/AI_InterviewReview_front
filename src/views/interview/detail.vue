@@ -18,6 +18,10 @@ const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
 const interview = ref(null)
+const rubricStatusLabels = {
+  FULLY_COVERED: '完全覆盖', MOSTLY_COVERED: '基本覆盖', PARTIALLY_COVERED: '部分覆盖',
+  MISSING: '未提及', INCORRECT: '存在错误', NOT_APPLICABLE: '不适用'
+}
 
 // 笔记
 const interviewNote = ref('')
@@ -171,6 +175,8 @@ const transcriptSegments = computed(() => {
   if (Array.isArray(value)) return value
   return value?.sentences || value?.segments || []
 })
+const dialogueTurns = computed(() => Array.isArray(interview.value?.dialogueTurns)
+  ? interview.value.dialogueTurns : [])
 
 function openSpeakerDialog() {
   const speakers = new Map()
@@ -410,6 +416,24 @@ onMounted(() => {
       </div>
 
       <!-- AI 建议 -->
+      <div class="section-card" v-if="interview.difficultySummary && Object.keys(interview.difficultySummary).length">
+        <h3 class="section-title">题目难度与领域表现</h3>
+        <p>难度只依据题目要求；均分只统计已计分问题，样本少于 2 题时仅供参考。</p>
+        <el-table :data="Object.entries(interview.difficultySummary).map(([level, value]) => ({ level, ...value }))" size="small">
+          <el-table-column prop="level" label="难度" />
+          <el-table-column prop="questionCount" label="题数" />
+          <el-table-column prop="averageScore" label="平均分" />
+          <el-table-column label="样本"><template #default="{ row }">{{ row.insufficientSample ? '不足' : '充足' }}</template></el-table-column>
+        </el-table>
+        <el-table v-if="interview.domainSummary && Object.keys(interview.domainSummary).length"
+                  :data="Object.entries(interview.domainSummary).map(([domain, value]) => ({ domain, ...value }))" size="small">
+          <el-table-column prop="domain" label="技术领域" />
+          <el-table-column prop="questionCount" label="题数" />
+          <el-table-column prop="averageScore" label="平均分" />
+          <el-table-column label="样本"><template #default="{ row }">{{ row.insufficientSample ? '不足' : '充足' }}</template></el-table-column>
+        </el-table>
+      </div>
+
       <div class="section-card" v-if="interview.improvementSummary || interview.strengths || interview.weaknesses">
         <h3 class="section-title">💡 AI 改进建议</h3>
         <div class="suggestion-grid">
@@ -440,16 +464,20 @@ onMounted(() => {
       <!-- 转写文本 -->
       <div class="section-card" v-if="interview.transcriptText">
         <h3 class="section-title">📄 角色化转写</h3>
-        <div v-if="transcriptSegments.length" class="segment-list">
-          <div v-for="(segment, index) in transcriptSegments" :key="`${segment.startTimeMs}-${index}`" class="segment-item">
+        <el-alert v-if="transcriptSegments.some(segment => segment.speakerRole === 'UNKNOWN')"
+                  title="部分说话人角色尚无法确认，请使用上方“校正说话人”指定面试官和应聘者。"
+                  type="warning" :closable="false" show-icon />
+        <div v-if="dialogueTurns.length" class="segment-list">
+          <div v-for="turn in dialogueTurns" :key="turn.turnIndex" class="segment-item">
             <div class="segment-meta">
-              <el-tag size="small" :type="segment.speakerRole === 'CANDIDATE' ? 'success' : segment.speakerRole === 'INTERVIEWER' ? 'primary' : 'info'">
-                {{ segment.speakerRole === 'CANDIDATE' ? '候选人' : segment.speakerRole === 'INTERVIEWER' ? '面试官' : '未知角色' }}
+              <el-tag size="small" :type="turn.role === 'CANDIDATE' ? 'success' : turn.role === 'INTERVIEWER' ? 'primary' : 'info'">
+                {{ turn.role === 'CANDIDATE' ? '应聘者' : turn.role === 'INTERVIEWER' ? '面试官' : '未知角色' }}
               </el-tag>
-              <span>{{ segment.speakerId || 'unknown' }}</span>
-              <span>{{ Math.floor((segment.startTimeMs || 0) / 1000) }}s–{{ Math.floor((segment.endTimeMs || 0) / 1000) }}s</span>
+              <span>{{ turn.speakerId || 'unknown' }}</span>
+              <span>{{ Math.floor((turn.startTimeMs || 0) / 1000) }}s–{{ Math.floor((turn.endTimeMs || 0) / 1000) }}s</span>
+              <span>合并 {{ turn.sourceSentenceIndexes?.length || 1 }} 个原始片段</span>
             </div>
-            <p>{{ segment.text }}</p>
+            <p>{{ turn.text }}</p>
           </div>
         </div>
         <div v-else class="transcript-text">{{ interview.transcriptText }}</div>
@@ -469,7 +497,9 @@ onMounted(() => {
               <div class="question-header">
                 <span class="question-index">第 {{ q.questionIndex }} 题</span>
                 <el-tag size="small" effect="plain">{{ q.questionType || '未分类' }}</el-tag>
+                <el-tag v-if="q.difficultyLevel" size="small" type="warning">{{ q.difficultyLevel }} · K{{ q.knowledgeDepth }}/C{{ q.problemComplexity }}</el-tag>
                 <el-tag v-if="!q.includedInScore" size="small" type="info">低置信度·不计分</el-tag>
+                <el-tag v-if="q.criticalErrors?.length" size="small" type="danger">存在关键错误</el-tag>
                 <span class="question-score" :style="{ color: getScoreColor(q.score) }">
                   {{ q.score == null ? '--' : `${q.score} 分` }}
                 </span>
@@ -488,11 +518,29 @@ onMounted(() => {
                 <h4>题目</h4>
                 <p>{{ q.questionText }}</p>
               </div>
+              <div class="question-section" v-if="q.followUpTexts?.length">
+                <h4>面试官追问</h4>
+                <p v-for="(followUp, index) in q.followUpTexts" :key="index">{{ index + 1 }}. {{ followUp }}</p>
+              </div>
+              <div class="question-section" v-if="q.difficultyLevel">
+                <h4>题目难度依据</h4>
+                <p>{{ q.domain }} · {{ q.questionCategory }} · {{ q.difficultyLevel }}（知识深度 K{{ q.knowledgeDepth }}，解题复杂度 C{{ q.problemComplexity }}）</p>
+                <p v-if="q.knowledgePoints?.length">知识点：{{ q.knowledgePoints.join('、') }}</p>
+                <p v-if="q.difficultyReason">{{ q.difficultyReason }}</p>
+              </div>
               <div class="question-section" v-if="q.answerText">
                 <h4>你的回答</h4>
                 <p>{{ q.answerText }}</p>
               </div>
-              <div class="mini-dimensions">
+              <div class="question-section" v-else-if="q.includedInScore">
+                <h4>你的回答</h4>
+                <p>未作答</p>
+              </div>
+              <div class="question-section low-confidence" v-if="!q.includedInScore">
+                <h4>不计分原因</h4>
+                <p>{{ q.lowConfidenceReason || '问答证据不足，请核对转写和说话人角色后重新分析。' }}</p>
+              </div>
+              <div class="mini-dimensions" v-if="q.includedInScore">
                 <div class="mini-dim">
                   <span class="mini-label">内容质量</span>
                   <el-progress :percentage="q.dimensionContent || 0" :color="getScoreColor(q.dimensionContent)" :stroke-width="6" :show-text="false" />
@@ -514,6 +562,29 @@ onMounted(() => {
                   <span class="mini-value">{{ q.dimensionProfessional || 0 }}</span>
                 </div>
               </div>
+              <div class="question-section" v-if="q.answerEvidence?.length">
+                <h4>回答证据</h4>
+                <p v-for="(evidence, index) in q.answerEvidence" :key="index">“{{ evidence }}”</p>
+              </div>
+              <div class="question-section critical-errors" v-if="q.criticalErrors?.length">
+                <h4>关键错误 · 本题最高 69 分</h4>
+                <p v-for="(error, index) in q.criticalErrors" :key="index">{{ index + 1 }}. {{ error }}</p>
+              </div>
+              <div class="question-section rubric" v-if="q.rubricDetail?.items?.length">
+                <h4>评分要点</h4>
+                <div class="rubric-item" v-for="item in q.rubricDetail.items" :key="item.id">
+                  <div class="rubric-heading">
+                    <strong>{{ item.title }}</strong>
+                    <el-tag size="small" effect="plain" :type="item.status === 'INCORRECT' ? 'danger' : 'info'">
+                      {{ rubricStatusLabels[item.status] || item.status }}
+                    </el-tag>
+                    <span>{{ item.awardedScore ?? 0 }} / {{ item.weight }} 分</span>
+                  </div>
+                  <p v-if="item.evidence">原文证据：“{{ item.evidence }}”</p>
+                  <p v-if="item.missingPoints?.length">缺失：{{ item.missingPoints.join('、') }}</p>
+                  <p v-if="item.incorrectClaims?.length">错误：{{ item.incorrectClaims.join('、') }}</p>
+                </div>
+              </div>
               <div class="question-section tip" v-if="q.improvementTip">
                 <h4>💡 改进建议</h4>
                 <p>{{ q.improvementTip }}</p>
@@ -525,6 +596,9 @@ onMounted(() => {
               <div class="question-section ref" v-if="q.referenceAnswer">
                 <h4>📖 参考答案</h4>
                 <p>{{ q.referenceAnswer }}</p>
+                <p v-if="q.rubricDetail?.keyPoints?.length" class="reference-key-points">
+                  关键要点：{{ q.rubricDetail.keyPoints.join('、') }}
+                </p>
               </div>
               <div class="question-section note">
                 <h4>📝 我的笔记</h4>
@@ -644,6 +718,8 @@ onMounted(() => {
 .segment-item p {
   margin: 8px 0 0;
   line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .segment-meta,
@@ -911,6 +987,39 @@ onMounted(() => {
   background: #fef9e7;
   padding: 14px;
   border-radius: 8px;
+}
+
+.question-section.low-confidence {
+  background: #f5f7fa;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.question-section.critical-errors {
+  background: #fef0f0;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.rubric-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.rubric-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.rubric-heading span:last-child {
+  margin-left: auto;
+  color: #606266;
+}
+
+.question-section .reference-key-points {
+  margin-top: 10px;
 }
 
 .question-section.ref {
