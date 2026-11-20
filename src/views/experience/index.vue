@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getExperienceList } from '@/api/experience'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 
@@ -14,24 +15,16 @@ const pagination = reactive({
 })
 
 const searchForm = reactive({
-  companyName: '',
+  keyword: '',
   positionTitle: '',
-  industry: '',
-  sortBy: 'createdAt'
+  sortBy: 'publishedAt'
 })
 
 const sortOptions = [
-  { value: 'createdAt', label: '最新发布' },
-  { value: 'overallScore', label: '评分最高' },
+  { value: 'publishedAt', label: '最新发布' },
+  { value: 'likeCount', label: '最多点赞' },
   { value: 'viewCount', label: '最多浏览' }
 ]
-
-const interviewTypeMap = {
-  coding: '技术面',
-  behavioral: '行为面',
-  system_design: '系统设计',
-  comprehensive: '综合'
-}
 
 async function fetchList() {
   loading.value = true
@@ -41,9 +34,8 @@ async function fetchList() {
       size: pagination.size,
       sortBy: searchForm.sortBy
     }
-    if (searchForm.companyName) params.companyName = searchForm.companyName
+    if (searchForm.keyword) params.keyword = searchForm.keyword
     if (searchForm.positionTitle) params.positionTitle = searchForm.positionTitle
-    if (searchForm.industry) params.industry = searchForm.industry
 
     const res = await getExperienceList(params)
     list.value = res.data.records
@@ -61,10 +53,9 @@ function handleSearch() {
 }
 
 function handleReset() {
-  searchForm.companyName = ''
+  searchForm.keyword = ''
   searchForm.positionTitle = ''
-  searchForm.industry = ''
-  searchForm.sortBy = 'createdAt'
+  searchForm.sortBy = 'publishedAt'
   pagination.page = 1
   fetchList()
 }
@@ -76,12 +67,6 @@ function goDetail(id) {
 function handlePageChange(page) {
   pagination.page = page
   fetchList()
-}
-
-function getScoreColor(score) {
-  if (score >= 80) return '#67c23a'
-  if (score >= 60) return '#e6a23c'
-  return '#f56c6c'
 }
 
 function formatTime(time) {
@@ -105,8 +90,8 @@ onMounted(() => {
       <p class="hero-desc">浏览其他用户的面试经验分享，学习面试技巧，提升竞争力</p>
       <div class="hero-search">
         <el-input
-          v-model="searchForm.companyName"
-          placeholder="搜索公司名称..."
+          v-model="searchForm.keyword"
+          placeholder="搜索面经标题..."
           size="large"
           clearable
           @keyup.enter="handleSearch"
@@ -133,14 +118,6 @@ onMounted(() => {
           @keyup.enter="handleSearch"
           style="width: 160px"
         />
-        <el-input
-          v-model="searchForm.industry"
-          placeholder="行业"
-          clearable
-          size="small"
-          @keyup.enter="handleSearch"
-          style="width: 120px"
-        />
         <el-button type="primary" size="small" @click="handleSearch">筛选</el-button>
         <el-button size="small" @click="handleReset">重置</el-button>
       </div>
@@ -156,22 +133,18 @@ onMounted(() => {
         class="experience-card"
         @click="goDetail(item.id)"
       >
-        <div class="card-top">
-          <el-tag v-if="item.interviewType" size="small" type="info" effect="plain" round>
-            {{ interviewTypeMap[item.interviewType] || item.interviewType }}
-          </el-tag>
-          <span class="score-badge" :style="{ background: getScoreColor(item.overallScore) }">
-            {{ item.overallScore }}分
-          </span>
-        </div>
+        <div class="card-top"><el-tag size="small" effect="plain">题目面经</el-tag></div>
         <h3 class="card-title">{{ item.title || '未命名面试' }}</h3>
         <div class="card-info">
-          <span v-if="item.companyName">{{ item.companyName }}</span>
           <span v-if="item.positionTitle">{{ item.positionTitle }}</span>
+          <span>发布者：{{ item.authorNickname || '匿名用户' }}</span>
+          <UserAvatar :size="24" :avatar="item.authorAvatar" />
         </div>
         <div class="card-footer">
           <span class="meta">📝 {{ item.questionCount || 0 }} 题</span>
           <span class="meta">👁️ {{ item.viewCount || 0 }} 浏览</span>
+          <span class="meta">👍 {{ item.likeCount || 0 }}</span>
+          <span class="meta">⭐ {{ item.favoriteCount || 0 }}</span>
           <span class="meta">{{ formatTime(item.publishedAt) }}</span>
         </div>
       </div>

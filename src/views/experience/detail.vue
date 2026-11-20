@@ -1,576 +1,116 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getExperienceDetail, getExperienceComments, addComment, deleteComment } from '@/api/experience'
+import { getExperienceDetail, getExperienceComments, addComment, deleteComment,
+  likeExperience, unlikeExperience, favoriteExperience, unfavoriteExperience } from '@/api/experience'
 import { useUserStore } from '@/store/useUserStore'
 import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(true)
 const experience = ref(null)
-
-// 评论
 const comments = ref([])
-const commentLoading = ref(false)
 const commentText = ref('')
+const commentLoading = ref(false)
 const commentPagination = reactive({ page: 1, size: 20, total: 0 })
-
-const interviewTypeMap = {
-  coding: '技术面',
-  behavioral: '行为面',
-  system_design: '系统设计',
-  comprehensive: '综合'
-}
-
-function getScoreColor(score) {
-  if (score >= 80) return '#67c23a'
-  if (score >= 60) return '#e6a23c'
-  return '#f56c6c'
-}
-
-function getScoreLabel(score) {
-  if (score >= 80) return '优秀'
-  if (score >= 60) return '良好'
-  return '待提升'
-}
-
-function formatTime(time) {
-  if (!time) return '--'
-  const d = new Date(time)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
+function formatTime(value) { return value ? new Date(value).toLocaleString('zh-CN') : '--' }
 async function fetchDetail() {
   loading.value = true
   try {
-    const res = await getExperienceDetail(route.params.id)
-    experience.value = res.data
-    fetchComments()
-  } catch (error) {
-    // 错误已在拦截器中处理
-  } finally {
-    loading.value = false
-  }
+    experience.value = (await getExperienceDetail(route.params.id)).data
+    await fetchComments()
+  } finally { loading.value = false }
 }
-
 async function fetchComments() {
-  try {
-    const res = await getExperienceComments(route.params.id, {
-      page: commentPagination.page,
-      size: commentPagination.size
-    })
-    comments.value = res.data.records
-    commentPagination.total = res.data.total
-  } catch (error) {
-    // 忽略
-  }
+  const res = await getExperienceComments(route.params.id, { page: commentPagination.page, size: commentPagination.size })
+  comments.value = res.data.records
+  commentPagination.total = res.data.total
 }
-
-async function handleAddComment() {
-  if (!commentText.value.trim()) {
-    ElMessage.warning('请输入评论内容')
-    return
-  }
+async function toggleLike() {
+  if (!userStore.isLoggedIn) { router.push('/login'); return }
+  if (experience.value.liked) await unlikeExperience(route.params.id)
+  else await likeExperience(route.params.id)
+  experience.value.liked = !experience.value.liked
+  experience.value.likeCount += experience.value.liked ? 1 : -1
+}
+async function toggleFavorite() {
+  if (!userStore.isLoggedIn) { router.push('/login'); return }
+  if (experience.value.favorited) await unfavoriteExperience(route.params.id)
+  else await favoriteExperience(route.params.id)
+  experience.value.favorited = !experience.value.favorited
+  experience.value.favoriteCount += experience.value.favorited ? 1 : -1
+}
+async function submitComment() {
+  if (!commentText.value.trim()) return ElMessage.warning('请输入评论内容')
   commentLoading.value = true
   try {
     await addComment(route.params.id, { content: commentText.value.trim() })
-    ElMessage.success('评论成功')
     commentText.value = ''
     commentPagination.page = 1
-    fetchComments()
-  } catch (error) {
-    // 错误已在拦截器中处理
-  } finally {
-    commentLoading.value = false
-  }
+    await fetchComments()
+    ElMessage.success('评论成功')
+  } finally { commentLoading.value = false }
 }
-
-async function handleDeleteComment(comment) {
-  try {
-    await ElMessageBox.confirm('确定要删除这条评论吗？', '确认删除', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await deleteComment(comment.id)
-    ElMessage.success('已删除')
-    fetchComments()
-  } catch (error) {
-    if (error !== 'cancel') {
-      // 错误已在拦截器中处理
-    }
-  }
+async function removeComment(item) {
+  await ElMessageBox.confirm('确定删除这条评论吗？', '删除评论', { type: 'warning' })
+  await deleteComment(item.id)
+  await fetchComments()
 }
-
-function handleCommentPageChange(page) {
-  commentPagination.page = page
-  fetchComments()
-}
-
-onMounted(() => {
-  fetchDetail()
-})
+onMounted(fetchDetail)
 </script>
 
 <template>
   <div class="experience-detail" v-loading="loading">
     <template v-if="experience">
-      <!-- 顶部信息卡片 -->
-      <div class="hero-card">
-        <div class="hero-info">
-          <div class="hero-tags">
-            <el-tag v-if="experience.interviewType" effect="plain" round size="small">
-              {{ interviewTypeMap[experience.interviewType] || experience.interviewType }}
-            </el-tag>
-          </div>
-          <h1 class="hero-title">{{ experience.title || '经验详情' }}</h1>
-          <div class="hero-meta">
-            <UserAvatar :size="24" :avatar="experience.authorAvatar" />
-            <span>{{ experience.authorNickname || '匿名发布者' }}</span>
-            <span v-if="experience.companyName">{{ experience.companyName }}</span>
-            <span v-if="experience.positionTitle">{{ experience.positionTitle }}</span>
-            <span v-if="experience.industry">{{ experience.industry }}</span>
-            <span>👁️ {{ experience.viewCount || 0 }} 浏览</span>
-            <span>{{ formatTime(experience.publishedAt) }}</span>
+      <section class="card hero">
+        <h1>{{ experience.title }}</h1>
+        <div class="meta"><UserAvatar :size="28" :avatar="experience.authorAvatar" />
+          <span>{{ experience.authorNickname || '匿名发布者' }}</span>
+          <span>{{ experience.positionTitle }}</span>
+          <span>{{ formatTime(experience.publishedAt) }}</span>
+        </div>
+        <div class="actions">
+          <el-button :type="experience.liked ? 'primary' : 'default'" @click="toggleLike">👍 {{ experience.likeCount || 0 }} 点赞</el-button>
+          <el-button :type="experience.favorited ? 'warning' : 'default'" @click="toggleFavorite">⭐ {{ experience.favoriteCount || 0 }} 收藏</el-button>
+          <span>👁️ {{ experience.viewCount || 0 }} 浏览</span>
+        </div>
+      </section>
+      <section class="card">
+        <h2>面试题目（{{ experience.questions?.length || 0 }}）</h2>
+        <article v-for="(q, index) in experience.questions" :key="q.id" class="question">
+          <h3>{{ index + 1 }}. {{ q.questionText }}</h3>
+          <div v-if="q.referenceAnswer" class="answer"><strong>AI 标准答案</strong><p>{{ q.referenceAnswer }}</p></div>
+        </article>
+      </section>
+      <section class="card">
+        <h2>评论（{{ commentPagination.total }}）</h2>
+        <div v-if="userStore.isLoggedIn">
+          <el-input v-model="commentText" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="写下你的看法" />
+          <el-button type="primary" :loading="commentLoading" @click="submitComment">发表评论</el-button>
+        </div>
+        <el-button v-else link type="primary" @click="router.push('/login')">登录后发表评论</el-button>
+        <div v-for="item in comments" :key="item.id" class="comment">
+          <UserAvatar :size="32" :avatar="item.avatar" />
+          <div><strong>{{ item.nickname || '匿名用户' }}</strong><small>{{ formatTime(item.createdAt) }}</small>
+            <p>{{ item.content }}</p>
+            <el-button v-if="userStore.userInfo && (userStore.userInfo.id === item.userId || userStore.isAdmin)"
+                       link type="danger" @click="removeComment(item)">删除</el-button>
           </div>
         </div>
-        <div class="hero-score" v-if="experience.overallScore != null">
-          <div class="big-score" :style="{ color: getScoreColor(experience.overallScore) }">
-            {{ experience.overallScore }}
-          </div>
-          <div class="score-desc" :style="{ color: getScoreColor(experience.overallScore) }">
-            {{ getScoreLabel(experience.overallScore) }}
-          </div>
-        </div>
-      </div>
-
-      <div class="section-card" v-if="experience.summaryMarkdown">
-        <h3 class="section-title">🧭 发布者经验总结</h3>
-        <div class="markdown-source">{{ experience.summaryMarkdown }}</div>
-      </div>
-
-      <!-- 维度评分 -->
-      <div class="section-card" v-if="experience.overallScore != null">
-        <h3 class="section-title">📊 评分维度</h3>
-        <div class="dimension-grid">
-          <div class="dimension-card">
-            <el-progress type="circle" :percentage="experience.dimensionContent || 0" :color="getScoreColor(experience.dimensionContent)" :width="80" :stroke-width="6" />
-            <span class="dimension-name">内容质量</span>
-          </div>
-          <div class="dimension-card">
-            <el-progress type="circle" :percentage="experience.dimensionLogic || 0" :color="getScoreColor(experience.dimensionLogic)" :width="80" :stroke-width="6" />
-            <span class="dimension-name">逻辑性</span>
-          </div>
-          <div class="dimension-card">
-            <el-progress type="circle" :percentage="experience.dimensionExpression || 0" :color="getScoreColor(experience.dimensionExpression)" :width="80" :stroke-width="6" />
-            <span class="dimension-name">表达能力</span>
-          </div>
-          <div class="dimension-card">
-            <el-progress type="circle" :percentage="experience.dimensionProfessional || 0" :color="getScoreColor(experience.dimensionProfessional)" :width="80" :stroke-width="6" />
-            <span class="dimension-name">专业度</span>
-          </div>
-          <div class="dimension-card">
-            <el-progress type="circle" :percentage="experience.dimensionCommunication || 0" :color="getScoreColor(experience.dimensionCommunication)" :width="80" :stroke-width="6" />
-            <span class="dimension-name">沟通能力</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- AI 建议 -->
-      <div class="section-card" v-if="experience.improvementSummary || experience.strengths || experience.weaknesses">
-        <h3 class="section-title">💡 AI 改进建议</h3>
-        <div class="suggestion-grid">
-          <div class="suggestion-card strengths" v-if="experience.strengths">
-            <div class="suggestion-header">
-              <span class="suggestion-icon">✅</span>
-              <span>优势</span>
-            </div>
-            <p>{{ experience.strengths }}</p>
-          </div>
-          <div class="suggestion-card weaknesses" v-if="experience.weaknesses">
-            <div class="suggestion-header">
-              <span class="suggestion-icon">⚠️</span>
-              <span>不足</span>
-            </div>
-            <p>{{ experience.weaknesses }}</p>
-          </div>
-          <div class="suggestion-card summary" v-if="experience.improvementSummary">
-            <div class="suggestion-header">
-              <span class="suggestion-icon">📝</span>
-              <span>总结</span>
-            </div>
-            <p>{{ experience.improvementSummary }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 题目列表 -->
-      <div class="section-card" v-if="experience.questions && experience.questions.length > 0">
-        <h3 class="section-title">📋 题目评分（{{ experience.questions.length }} 题）</h3>
-        <el-collapse>
-          <el-collapse-item
-            v-for="q in experience.questions"
-            :key="q.id"
-            :name="q.id"
-          >
-            <template #title>
-              <div class="question-header">
-                <span class="question-index">第 {{ q.questionIndex }} 题</span>
-                <span class="question-score" :style="{ color: getScoreColor(q.score) }">
-                  {{ q.score }} 分
-                </span>
-              </div>
-            </template>
-            <div class="question-content">
-              <div class="question-section">
-                <h4>题目</h4>
-                <p>{{ q.questionText }}</p>
-              </div>
-              <div class="question-section tip" v-if="q.improvementTip">
-                <h4>💡 改进建议</h4>
-                <p>{{ q.improvementTip }}</p>
-              </div>
-              <div class="question-section" v-if="q.answerDifference">
-                <h4>🔎 关键差距</h4>
-                <p>{{ q.answerDifference }}</p>
-              </div>
-              <div class="question-section ref" v-if="q.referenceAnswer">
-                <h4>📖 参考答案</h4>
-                <p>{{ q.referenceAnswer }}</p>
-              </div>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-
-      <!-- 评论区 -->
-      <div class="section-card">
-        <h3 class="section-title">💬 评论（{{ commentPagination.total }}）</h3>
-
-        <!-- 发表评论 -->
-        <div class="comment-input" v-if="userStore.isLoggedIn">
-          <el-input
-            v-model="commentText"
-            type="textarea"
-            :rows="3"
-            maxlength="500"
-            show-word-limit
-            placeholder="分享你的看法..."
-          />
-          <el-button type="primary" style="margin-top: 8px;" :loading="commentLoading" @click="handleAddComment">
-            发表评论
-          </el-button>
-        </div>
-        <div v-else class="login-tip">
-          <el-link type="primary" href="/login">登录</el-link>后可发表评论
-        </div>
-
-        <!-- 评论列表 -->
-        <div class="comment-list">
-          <div v-for="item in comments" :key="item.id" class="comment-item">
-            <div class="comment-avatar">
-              <UserAvatar :size="36" :avatar="item.avatar" />
-            </div>
-            <div class="comment-body">
-              <div class="comment-header">
-                <span class="comment-user">{{ item.nickname || item.username || '匿名用户' }}</span>
-                <span class="comment-time">{{ formatTime(item.createdAt) }}</span>
-              </div>
-              <div class="comment-text">{{ item.content }}</div>
-              <div class="comment-actions" v-if="userStore.userInfo && (userStore.userInfo.id === item.userId || userStore.userInfo.id === experience.userId || userStore.isAdmin)">
-                <el-button type="danger" link size="small" @click="handleDeleteComment(item)">删除</el-button>
-              </div>
-            </div>
-          </div>
-          <el-empty v-if="comments.length === 0" description="暂无评论" :image-size="80" />
-        </div>
-
-        <!-- 评论分页 -->
-        <div class="pagination-wrapper" v-if="commentPagination.total > commentPagination.size">
-          <el-pagination
-            v-model:current-page="commentPagination.page"
-            :page-size="commentPagination.size"
-            :total="commentPagination.total"
-            layout="prev, pager, next"
-            @current-change="handleCommentPageChange"
-          />
-        </div>
-      </div>
+        <el-pagination v-if="commentPagination.total > commentPagination.size" v-model:current-page="commentPagination.page"
+                       :page-size="commentPagination.size" :total="commentPagination.total" layout="prev, pager, next"
+                       @current-change="fetchComments" />
+      </section>
     </template>
   </div>
 </template>
 
 <style scoped>
-.experience-detail {
-  padding-bottom: 40px;
-}
-
-.markdown-source {
-  line-height: 1.8;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* 顶部信息卡片 */
-.hero-card {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-  border-radius: 16px;
-  padding: 32px;
-  color: #fff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.hero-info {
-  flex: 1;
-}
-
-.hero-tags {
-  margin-bottom: 10px;
-}
-
-.hero-tags .el-tag {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: #fff;
-}
-
-.hero-title {
-  margin: 0 0 12px;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.hero-meta {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  opacity: 0.85;
-  flex-wrap: wrap;
-}
-
-.hero-score {
-  text-align: center;
-  min-width: 100px;
-}
-
-.big-score {
-  font-size: 56px;
-  font-weight: 800;
-  line-height: 1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.score-desc {
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 4px;
-}
-
-/* 区域卡片 */
-.section-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.section-title {
-  margin: 0 0 20px;
-  font-size: 17px;
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 维度评分 */
-.dimension-grid {
-  display: flex;
-  justify-content: space-around;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.dimension-card {
-  text-align: center;
-}
-
-.dimension-name {
-  display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  color: #606266;
-  font-weight: 500;
-}
-
-/* AI 建议 */
-.suggestion-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.suggestion-card {
-  border-radius: 10px;
-  padding: 18px;
-  border: 1px solid #ebeef5;
-}
-
-.suggestion-card.strengths {
-  background: #f0f9eb;
-  border-color: #e1f3d8;
-}
-
-.suggestion-card.weaknesses {
-  background: #fef0f0;
-  border-color: #fde2e2;
-}
-
-.suggestion-card.summary {
-  background: #f0f7ff;
-  border-color: #d9ecff;
-}
-
-.suggestion-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 10px;
-  color: #303133;
-}
-
-.suggestion-card p {
-  margin: 0;
-  color: #606266;
-  font-size: 13px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-/* 题目 */
-.question-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-}
-
-.question-index {
-  font-weight: 600;
-  color: #303133;
-}
-
-.question-score {
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.question-content {
-  padding: 8px 0;
-}
-
-.question-section {
-  margin-bottom: 16px;
-}
-
-.question-section h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-  color: #303133;
-  font-weight: 600;
-}
-
-.question-section p {
-  margin: 0;
-  color: #606266;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  font-size: 14px;
-}
-
-.question-section.tip {
-  background: #fef9e7;
-  padding: 14px;
-  border-radius: 8px;
-}
-
-.question-section.ref {
-  background: #f0f7ff;
-  padding: 14px;
-  border-radius: 8px;
-}
-
-/* 评论 */
-.comment-input {
-  margin-bottom: 20px;
-}
-
-.login-tip {
-  text-align: center;
-  padding: 16px;
-  color: #909399;
-  background: #f5f7fa;
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-
-.comment-list {
-  border-top: 1px solid #f2f3f5;
-  padding-top: 16px;
-}
-
-.comment-item {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid #f2f3f5;
-}
-
-.comment-item:last-child {
-  border-bottom: none;
-}
-
-.comment-body {
-  flex: 1;
-}
-
-.comment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.comment-user {
-  font-weight: 600;
-  color: #303133;
-  font-size: 14px;
-}
-
-.comment-time {
-  font-size: 12px;
-  color: #909399;
-}
-
-.comment-text {
-  color: #606266;
-  line-height: 1.6;
-  font-size: 14px;
-}
-
-.comment-actions {
-  margin-top: 8px;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 16px;
-}
+.experience-detail{max-width:960px;margin:28px auto;padding:0 16px 40px;color:#243447}
+.card{background:#fff;border:1px solid #e7edf3;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 7px 25px #22354a08}
+h1{font-size:28px;margin:0 0 18px}h2{font-size:20px;margin:0 0 18px}.meta,.actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#718096}.actions{margin-top:22px}
+.question{padding:18px 0;border-top:1px solid #edf1f5}.question h3{font-size:17px;margin:0 0 12px;white-space:pre-wrap}.answer{background:#f5f9fb;border-radius:9px;padding:16px;line-height:1.8}.answer p{white-space:pre-wrap;margin:8px 0 0}.comment{display:flex;gap:12px;padding:18px 0;border-bottom:1px solid #edf1f5}.comment small{margin-left:12px;color:#909eaa}.comment p{white-space:pre-wrap}
 </style>

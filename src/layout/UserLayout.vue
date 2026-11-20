@@ -16,7 +16,9 @@ const navLinks = [
   { path: '/interviews', label: '我的面试' },
   { path: '/interview/upload', label: '上传面试' },
   { path: '/experiences', label: '经验广场' },
-  { path: '/favorites', label: '我的收藏' }
+  { path: '/favorites', label: '题目收藏' },
+  { path: '/my-experiences', label: '我的面经' },
+  { path: '/experience-favorites', label: '收藏的面经' }
 ]
 
 function isActive(path) {

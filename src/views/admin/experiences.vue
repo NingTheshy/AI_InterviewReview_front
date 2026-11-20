@@ -76,11 +76,13 @@ onMounted(() => {
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="发布者" width="120" />
+        <el-table-column prop="title" label="面经标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="positionTitle" label="岗位" width="150" show-overflow-tooltip />
         <el-table-column prop="interviewId" label="面试ID" width="90" />
         <el-table-column label="状态" min-width="180">
           <template #default="{ row }">
             <el-tag :type="row.publishStatus === 'PUBLISHED' ? 'success' : 'info'" size="small">
-              {{ row.publishStatus === 'PUBLISHED' ? '已发布' : '已撤回' }}
+              {{ row.publishStatus === 'PUBLISHED' ? '已发布' : '已删除' }}
             </el-tag>
             <el-tag :type="row.moderationStatus === 'BLOCKED' ? 'danger' : 'success'" size="small" style="margin-left: 4px">
               {{ row.moderationStatus === 'BLOCKED' ? '违规下架' : '治理正常' }}

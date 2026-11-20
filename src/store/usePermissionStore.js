@@ -64,6 +64,18 @@ export const usePermissionStore = defineStore('permission', () => {
             meta: { title: '我的收藏', icon: 'Star', permissions: ['favorite:manage'] }
           },
           {
+            path: 'my-experiences',
+            name: 'MyExperiences',
+            component: () => import('@/views/experience/mine.vue'),
+            meta: { title: '我的面经', permissions: ['experience:publish'] }
+          },
+          {
+            path: 'experience-favorites',
+            name: 'ExperienceFavorites',
+            component: () => import('@/views/experience/favorites.vue'),
+            meta: { title: '收藏的面经', permissions: ['experience:interact'] }
+          },
+          {
             path: 'profile',
             name: 'Profile',
             component: () => import('@/views/profile/index.vue'),

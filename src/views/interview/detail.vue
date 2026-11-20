@@ -8,7 +8,7 @@ import {
 } from '@/api/interview'
 import { addFavorite } from '@/api/favorite'
 import {
-  publishExperience, getPublication, updatePublication, withdrawPublication
+  publishExperience, getPublicationCandidates, updatePublication, deletePublication
 } from '@/api/publication'
 import axios from 'axios'
 import { getToken } from '@/utils/auth'
@@ -120,47 +120,70 @@ async function handleFavoriteQuestion(questionId) {
 // 公开面经发布
 const publicationDialogVisible = ref(false)
 const publication = ref(null)
-const publicationSummary = ref('')
+const publicationQuestions = ref([])
+const publicationTitle = ref('')
+const selectedPublicationIds = ref([])
+const confirmedSensitiveIds = ref([])
+const showPublicationAnswers = ref(false)
 const publicationLoading = ref(false)
+const publicationPreviewing = ref(false)
+
+const selectedPublicationQuestions = computed(() => publicationQuestions.value.filter(q => selectedPublicationIds.value.includes(q.id)))
 
 async function openPublicationDialog() {
   publicationLoading.value = true
   try {
-    const res = await getPublication(route.params.id)
+    const res = await getPublicationCandidates(route.params.id)
     publication.value = res.data
-    publicationSummary.value = res.data?.summaryMarkdown || ''
+    publicationQuestions.value = res.data?.questions || []
+    publicationTitle.value = res.data?.title || `${res.data?.positionTitle || '岗位'}面经-${new Date().toISOString().slice(0, 10)}`
+    selectedPublicationIds.value = res.data?.selectedQuestionIds || []
+    confirmedSensitiveIds.value = []
+    showPublicationAnswers.value = res.data?.showReferenceAnswers || false
+    publicationPreviewing.value = false
   } catch {
-    publication.value = null
-    publicationSummary.value = ''
+    return
   } finally {
     publicationLoading.value = false
-    publicationDialogVisible.value = true
   }
+  publicationDialogVisible.value = true
+}
+
+function previewPublication() {
+  if (!selectedPublicationIds.value.length) {
+    ElMessage.warning('请至少选择一道题目')
+    return
+  }
+  const unconfirmed = selectedPublicationQuestions.value.find(q => q.sensitive && !confirmedSensitiveIds.value.includes(q.id))
+  if (unconfirmed) { ElMessage.warning('请逐题确认涉及个人经历的题目'); return }
+  if (showPublicationAnswers.value && selectedPublicationQuestions.value.some(q => !q.referenceAnswer?.trim())) {
+    ElMessage.warning('所选题目中有题目缺少 AI 标准答案'); return
+  }
+  publicationPreviewing.value = true
 }
 
 async function savePublication() {
-  if (publicationSummary.value.length > 10000) {
-    ElMessage.warning('经验总结不能超过 10000 字')
-    return
-  }
+  const body = { title: publicationTitle.value, selectedQuestionIds: selectedPublicationIds.value,
+    showReferenceAnswers: showPublicationAnswers.value, confirmedSensitiveQuestionIds: confirmedSensitiveIds.value }
   publicationLoading.value = true
   try {
-    const res = publication.value
-      ? await updatePublication(route.params.id, publicationSummary.value)
-      : await publishExperience(route.params.id, publicationSummary.value)
+    const res = publication.value?.publishStatus === 'PUBLISHED'
+      ? await updatePublication(publication.value.id, body)
+      : await publishExperience(route.params.id, body)
     publication.value = res.data
-    ElMessage.success(publication.value?.publishStatus === 'PUBLISHED' ? '面经已发布' : '面经已保存')
+    publicationDialogVisible.value = false
+    ElMessage.success('面经已保存并公开')
   } finally {
     publicationLoading.value = false
   }
 }
 
 async function handleWithdrawPublication() {
-  await ElMessageBox.confirm('撤回后公开页面和评论将隐藏，之后可以重新发布。', '撤回面经', { type: 'warning' })
-  await withdrawPublication(route.params.id)
+  await ElMessageBox.confirm('删除后旧链接失效，评论、点赞和收藏清零。重新发布将生成新链接。', '删除面经', { type: 'warning' })
+  await deletePublication(publication.value.id)
   publication.value = null
   publicationDialogVisible.value = false
-  ElMessage.success('面经已撤回')
+  ElMessage.success('面经已删除')
 }
 
 function openPublishedExperience() {
@@ -641,7 +664,7 @@ onMounted(() => {
         </el-button>
       </div>
 
-      <el-dialog v-model="publicationDialogVisible" title="公开面经" width="620px">
+      <el-dialog v-model="publicationDialogVisible" title="发布题目面经" width="780px">
         <el-alert
           v-if="publication?.moderationStatus === 'BLOCKED'"
           type="error"
@@ -649,24 +672,45 @@ onMounted(() => {
           title="该面经已被管理员下架，用户无法自行重新发布"
           style="margin-bottom: 14px"
         />
-        <el-input
-          v-model="publicationSummary"
-          type="textarea"
-          :rows="10"
-          maxlength="10000"
-          show-word-limit
-          placeholder="使用 Markdown 总结本次面试经验。公开内容不会包含音频、简历、完整转写、原回答和私人笔记。"
-        />
+        <template v-if="!publicationPreviewing">
+        <el-input v-model="publicationTitle" maxlength="200" show-word-limit placeholder="面经标题" />
+        <p>请选择要公开的面试题。个人经历等题目默认不选；勾选后须逐题确认。</p>
+        <el-switch v-model="showPublicationAnswers" active-text="公开所选题目的 AI 标准答案" inactive-text="只公开题目" @change="confirmedSensitiveIds = []" />
+        <div style="max-height: 420px; overflow-y: auto; margin-top: 16px">
+          <div v-for="q in publicationQuestions" :key="q.id" class="question-section" style="margin-bottom: 12px; padding: 12px; border: 1px solid #ebeef5; border-radius: 8px">
+            <el-checkbox v-model="selectedPublicationIds" :label="q.id">第 {{ q.questionIndex }} 题：{{ q.questionText }}</el-checkbox>
+            <el-tag v-if="q.sensitive" type="warning" size="small">可能涉及隐私</el-tag>
+            <template v-if="selectedPublicationIds.includes(q.id)">
+              <p v-if="showPublicationAnswers" style="white-space: pre-wrap">AI 标准答案：{{ q.referenceAnswer || '暂无答案，请取消选择此题' }}</p>
+              <el-checkbox v-if="q.sensitive" v-model="confirmedSensitiveIds" :label="q.id">
+                我已逐字检查本题{{ showPublicationAnswers ? '及答案' : '' }}，确认可以公开
+              </el-checkbox>
+            </template>
+          </div>
+        </div>
+        </template>
+        <div v-else style="max-height: 480px; overflow-y: auto">
+          <h2>{{ publicationTitle || `${publication?.positionTitle}面经` }}</h2>
+          <p>岗位：{{ publication?.positionTitle }}</p>
+          <p>公开方式：{{ showPublicationAnswers ? '题目及 AI 标准答案' : '仅题目' }}</p>
+          <article v-for="q in selectedPublicationQuestions" :key="q.id" class="question-section" style="margin: 12px 0; padding: 12px; border: 1px solid #ebeef5; border-radius: 8px; white-space: pre-wrap">
+            <strong>第 {{ q.questionIndex }} 题：{{ q.questionText }}</strong>
+            <p v-if="showPublicationAnswers">AI 标准答案：{{ q.referenceAnswer }}</p>
+          </article>
+        </div>
+        <el-alert title="公开页不会展示原回答、简历、完整转写和个人评分；若文字中包含手机号、邮箱或身份证号，服务端会拒绝发布该题。"
+                  type="info" :closable="false" style="margin-top: 12px" />
         <template #footer>
-          <el-button v-if="publication" type="danger" plain @click="handleWithdrawPublication">撤回</el-button>
-          <el-button v-if="publication?.id" @click="openPublishedExperience">查看公开页</el-button>
+          <el-button v-if="publication?.publishStatus === 'PUBLISHED'" type="danger" plain @click="handleWithdrawPublication">删除面经</el-button>
+          <el-button v-if="publication?.publishStatus === 'PUBLISHED'" @click="openPublishedExperience">查看公开页</el-button>
+          <el-button v-if="publicationPreviewing" @click="publicationPreviewing = false">返回修改</el-button>
           <el-button
             type="primary"
             :loading="publicationLoading"
             :disabled="publication?.moderationStatus === 'BLOCKED'"
-            @click="savePublication"
+            @click="publicationPreviewing ? savePublication() : previewPublication()"
           >
-            {{ publication ? '保存并重新发布' : '立即发布' }}
+            {{ publicationPreviewing ? (publication?.publishStatus === 'PUBLISHED' ? '确认保存' : '确认发布') : '预览公开内容' }}
           </el-button>
         </template>
       </el-dialog>
