@@ -23,7 +23,14 @@ onMounted(load)
       <el-button @click="router.push(`/experiences/${row.id}`)">阅读</el-button>
       <el-button type="warning" plain @click="remove(row)">取消收藏</el-button>
     </el-card>
-    <el-pagination v-if="total > 10" v-model:current-page="page" :page-size="10" :total="total" @current-change="load" />
+    <div v-if="total > 10" class="pagination-wrapper">
+      <el-pagination v-model:current-page="page" :page-size="10" :total="total" @current-change="load" />
+    </div>
   </div>
 </template>
-<style scoped>.page{max-width:1000px;margin:30px auto;padding:0 20px}.post{margin-bottom:16px}.post p{color:#718096}</style>
+<style scoped>
+.page { flex: 1; display: flex; flex-direction: column; width: 100%; max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+.post { margin-bottom: 16px; }
+.post p { color: #718096; }
+.pagination-wrapper { display: flex; justify-content: center; margin-top: auto; padding-top: 24px; position: sticky; bottom: 0; z-index: 5; background: #f4f7f8; }
+</style>

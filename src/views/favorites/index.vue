@@ -165,6 +165,9 @@ onMounted(() => {
 
 <style scoped>
 .favorites-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding-bottom: 20px;
 }
 
@@ -308,6 +311,11 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: auto;
+  padding-top: 24px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #f4f7f8;
 }
 </style>

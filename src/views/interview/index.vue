@@ -341,33 +341,30 @@ onBeforeUnmount(() => {
           v-model="searchForm.companyName"
           placeholder="公司名称"
           clearable
-          size="small"
-          style="width: 140px"
+          style="width: 165px"
         />
         <el-input
           v-model="searchForm.positionTitle"
           placeholder="职位名称"
           clearable
-          size="small"
           @keyup.enter="handleSearch"
-          style="width: 160px"
+          style="width: 180px"
         />
-        <el-select v-model="searchForm.status" placeholder="处理状态" clearable size="small" style="width: 120px">
+        <el-select v-model="searchForm.status" placeholder="处理状态" clearable style="width: 145px">
           <el-option v-for="(item, value) in statusMap" :key="value" :label="item.label" :value="Number(value)" />
         </el-select>
         <el-input
           v-model="searchForm.industry"
           placeholder="行业"
           clearable
-          size="small"
           @keyup.enter="handleSearch"
-          style="width: 120px"
+          style="width: 140px"
         />
-        <el-button type="primary" size="small" @click="handleSearch">筛选</el-button>
-        <el-button size="small" @click="handleReset">重置</el-button>
+        <el-button type="primary" @click="handleSearch">筛选</el-button>
+        <el-button @click="handleReset">重置</el-button>
       </div>
       <div class="filter-right">
-        <el-select v-model="searchForm.sortBy" size="small" @change="handleSearch" style="width: 140px">
+        <el-select v-model="searchForm.sortBy" @change="handleSearch" style="width: 165px">
           <el-option v-for="item in sortOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
       </div>
@@ -501,6 +498,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .interview-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding-bottom: 20px;
   --accent: #0e758f;
   --accent-soft: #e6f4f5;
@@ -608,8 +608,10 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
   margin-bottom: 20px;
-  padding: 14px 16px;
+  padding: 18px 20px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(21, 59, 69, 0.07);
   border-radius: 14px;
@@ -618,9 +620,12 @@ onBeforeUnmount(() => {
 
 .filter-left {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
+
+.filter-left .el-button + .el-button { margin-left: 0; }
 
 /* 卡片网格 */
 .card-grid {
@@ -758,7 +763,12 @@ onBeforeUnmount(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: auto;
+  padding-top: 24px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #f4f7f8;
 }
 
 @media (max-width: 640px) {
@@ -766,7 +776,8 @@ onBeforeUnmount(() => {
   .hero-search, .filter-bar, .filter-left { align-items: stretch; flex-direction: column; }
   .hero-search .el-button { width: 100%; }
   .filter-bar { gap: 12px; }
-  .filter-left :deep(.el-input), .filter-right :deep(.el-select) { width: 100% !important; }
+  .filter-left :deep(.el-input), .filter-left :deep(.el-select), .filter-right :deep(.el-select) { width: 100% !important; }
+  .filter-left .el-button { width: 100%; }
   .filter-right { width: 100%; }
   .card-grid { grid-template-columns: 1fr; }
 }

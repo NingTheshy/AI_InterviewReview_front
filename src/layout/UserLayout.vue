@@ -93,7 +93,7 @@ function goLogin() {
     </header>
 
     <!-- 内容区 -->
-    <main class="main-content">
+    <main class="main-content" :class="{ 'paginated-main': ['InterviewList', 'Favorites', 'ExperienceSquare', 'ExperienceDetailPublic', 'MyExperiences', 'ExperienceFavorites'].includes(route.name) }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -231,6 +231,11 @@ function goLogin() {
   width: 100%;
   margin: 0 auto;
   padding: 32px 24px 40px;
+}
+
+.main-content.paginated-main {
+  display: flex;
+  flex-direction: column;
 }
 
 /* 底部 */

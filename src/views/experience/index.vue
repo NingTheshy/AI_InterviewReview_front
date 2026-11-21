@@ -165,6 +165,9 @@ onMounted(() => {
 
 <style scoped>
 .experience-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding-bottom: 20px;
   --accent: #0e758f;
 }
@@ -319,7 +322,12 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: auto;
+  padding-top: 24px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #f4f7f8;
 }
 
 @media (max-width: 640px) {

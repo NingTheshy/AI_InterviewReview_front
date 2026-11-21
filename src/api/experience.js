@@ -20,6 +20,11 @@ export function getExperienceComments(id, params) {
   return request.get(`/experiences/${id}/comments`, { params })
 }
 
+// 分页获取某条评论的直接回复
+export function getCommentReplies(experienceId, parentId, params) {
+  return request.get(`/experiences/${experienceId}/comments/${parentId}/replies`, { params })
+}
+
 // 发表评论
 export function addComment(id, data) {
   return request.post(`/experiences/${id}/comments`, data)

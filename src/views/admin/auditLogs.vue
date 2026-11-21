@@ -4,7 +4,7 @@ import { getAuditLogList } from '@/api/admin'
 
 const loading = ref(false)
 const tableData = ref([])
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 async function fetchList() {
   loading.value = true
@@ -44,7 +44,7 @@ onMounted(fetchList)
 
 <template>
   <div class="audit-page">
-    <el-card shadow="never">
+    <el-card shadow="never" class="pagination-card">
       <template #header>
         <div class="card-header">
           <div>
@@ -107,7 +107,7 @@ onMounted(fetchList)
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.size"
         :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
+        :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next"
         class="pagination"
         @current-change="fetchList"
@@ -118,10 +118,12 @@ onMounted(fetchList)
 </template>
 
 <style scoped>
-.audit-page { padding: 4px; }
+.audit-page { min-height: 100%; display: flex; padding: 4px; }
+.pagination-card { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
+.pagination-card :deep(.el-card__body) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .card-header p { margin: 5px 0 0; color: #909399; font-size: 13px; }
-.pagination { justify-content: flex-end; margin-top: 20px; }
+.pagination { justify-content: flex-end; margin-top: auto; padding-top: 20px; position: sticky; bottom: 0; z-index: 5; background: #fff; }
 .audit-table :deep(.el-table__cell) { padding: 13px 0; }
 .primary-text { color: #263b49; font-size: 13px; font-weight: 600; }
 .secondary-text { margin-top: 5px; color: #8b9ba7; font-size: 11px; }
@@ -132,6 +134,6 @@ onMounted(fetchList)
 @media (max-width: 768px) {
   .audit-detail { padding: 12px; }
   .audit-detail :deep(.el-descriptions__body) { overflow-x: auto; }
-  .pagination { overflow-x: auto; justify-content: flex-start; }
+  .pagination { overflow-x: auto; }
 }
 </style>

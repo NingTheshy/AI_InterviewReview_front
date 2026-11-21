@@ -105,7 +105,7 @@ onMounted(() => {
 
 <template>
   <div class="admin-users">
-    <el-card>
+    <el-card class="pagination-card">
       <template #header>
         <span>用户管理</span>
       </template>
@@ -196,6 +196,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.admin-users { min-height: 100%; display: flex; }
+.pagination-card { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
+.pagination-card :deep(.el-card__body) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .search-form {
   margin-bottom: 16px;
 }
@@ -203,6 +206,11 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: auto;
+  padding-top: 20px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #fff;
 }
 </style>

@@ -1,16 +1,29 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAdminExperienceList, setExperienceStatus } from '@/api/admin'
+import { getAdminExperienceList, getAdminExperienceDetail, setExperienceStatus } from '@/api/admin'
 
 const loading = ref(false)
 const tableData = ref([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
+const filters = reactive({ title: '', author: '', company: '', position: '', moderation: '', dates: [] })
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detail = ref(null)
+const compactViewport = ref(window.innerWidth < 1200)
+const narrowViewport = ref(window.innerWidth < 1000)
+const tinyViewport = ref(window.innerWidth < 900)
 
 async function fetchList() {
   loading.value = true
   try {
-    const res = await getAdminExperienceList({ page: pagination.page, size: pagination.size })
+    const params = { page: pagination.page, size: pagination.size }
+    for (const key of ['title', 'author', 'company', 'position']) {
+      if (filters[key]?.trim()) params[key] = filters[key].trim()
+    }
+    if (filters.moderation) params.moderation = filters.moderation
+    if (filters.dates?.length === 2) [params.from, params.to] = filters.dates
+    const res = await getAdminExperienceList(params)
     tableData.value = res.data.records
     pagination.total = res.data.total
   } catch (error) {
@@ -18,6 +31,12 @@ async function fetchList() {
   } finally {
     loading.value = false
   }
+}
+
+function search() { pagination.page = 1; fetchList() }
+function reset() {
+  Object.assign(filters, { title: '', author: '', company: '', position: '', moderation: '', dates: [] })
+  search()
 }
 
 function handlePageChange(page) {
@@ -33,7 +52,7 @@ function handleSizeChange(size) {
 
 async function handleToggleStatus(row) {
   const newStatus = row.moderationStatus === 'NORMAL' ? 0 : 1
-  const action = newStatus === 0 ? '下架' : '恢复'
+  const action = newStatus === 0 ? '下架' : '重新上架'
   try {
     await ElMessageBox.confirm(`确定要${action}该经验吗？`, '确认', {
       confirmButtonText: '确定',
@@ -50,6 +69,17 @@ async function handleToggleStatus(row) {
   }
 }
 
+async function viewDetail(row) {
+  detailVisible.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    detail.value = (await getAdminExperienceDetail(row.id)).data
+  } finally {
+    detailLoading.value = false
+  }
+}
+
 function formatTime(time) {
   if (!time) return '--'
   const d = new Date(time)
@@ -61,50 +91,77 @@ function formatTime(time) {
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
+function updateViewport() {
+  compactViewport.value = window.innerWidth < 1200
+  narrowViewport.value = window.innerWidth < 1000
+  tinyViewport.value = window.innerWidth < 900
+}
+
 onMounted(() => {
+  window.addEventListener('resize', updateViewport)
   fetchList()
 })
+onBeforeUnmount(() => window.removeEventListener('resize', updateViewport))
 </script>
 
 <template>
   <div class="admin-experiences">
-    <el-card>
+    <el-card class="management-card">
       <template #header>
         <span>经验管理</span>
       </template>
 
-      <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="发布者" width="120" />
-        <el-table-column prop="title" label="面经标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="positionTitle" label="岗位" width="150" show-overflow-tooltip />
-        <el-table-column prop="interviewId" label="面试ID" width="90" />
-        <el-table-column label="状态" min-width="180">
+      <div class="filter-bar">
+        <el-input v-model="filters.title" placeholder="面经标题" clearable @keyup.enter="search" />
+        <el-input v-model="filters.author" placeholder="发布者" clearable @keyup.enter="search" />
+        <el-input v-model="filters.company" placeholder="公司" clearable @keyup.enter="search" />
+        <el-input v-model="filters.position" placeholder="岗位" clearable @keyup.enter="search" />
+        <el-select v-model="filters.moderation" placeholder="治理状态" clearable @change="search">
+          <el-option label="正常" value="NORMAL" /><el-option label="已下架" value="BLOCKED" />
+        </el-select>
+        <el-date-picker v-model="filters.dates" type="datetimerange" value-format="YYYY-MM-DDTHH:mm:ss"
+          format="MM-DD HH:mm" range-separator="至" start-placeholder="开始时间" end-placeholder="结束时间"
+          @change="search" />
+        <el-button type="primary" @click="search">查询</el-button><el-button @click="reset">重置</el-button>
+      </div>
+
+      <el-table :data="tableData" v-loading="loading" stripe table-layout="fixed" class="management-table">
+        <el-table-column label="面经标题" min-width="210">
           <template #default="{ row }">
-            <el-tag :type="row.publishStatus === 'PUBLISHED' ? 'success' : 'info'" size="small">
-              {{ row.publishStatus === 'PUBLISHED' ? '已发布' : '已删除' }}
-            </el-tag>
-            <el-tag :type="row.moderationStatus === 'BLOCKED' ? 'danger' : 'success'" size="small" style="margin-left: 4px">
-              {{ row.moderationStatus === 'BLOCKED' ? '违规下架' : '治理正常' }}
+            <div class="cell-text" :title="`#${row.id} ${row.title || ''}`">#{{ row.id }} {{ row.title || '--' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!narrowViewport" label="发布者" min-width="95">
+          <template #default="{ row }"><div class="cell-text" :title="row.authorDisplayName || row.username || String(row.userId)">{{ row.authorDisplayName || row.username || row.userId }}</div></template>
+        </el-table-column>
+        <el-table-column v-if="!compactViewport" label="公司 / 岗位" min-width="190">
+          <template #default="{ row }">
+            <div class="cell-text" :title="[row.companyName, row.positionTitle].filter(Boolean).join(' / ')">{{ row.companyName || '--' }} / {{ row.positionTitle || '--' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!tinyViewport" label="发布时间" width="145">
+          <template #default="{ row }">{{ formatTime(row.publishedAt) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.moderationStatus === 'BLOCKED' ? 'danger' : 'success'" size="small">
+              {{ row.moderationStatus === 'BLOCKED' ? '已下架' : '正常公开' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="viewCount" label="浏览" width="80" align="center">
-          <template #default="{ row }">{{ row.viewCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column label="发布时间" width="160">
-          <template #default="{ row }">{{ formatTime(row.publishedAt) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button
-              v-permission="'experience:manage'"
-              :type="row.moderationStatus === 'NORMAL' ? 'danger' : 'success'"
-              link size="small"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.moderationStatus === 'NORMAL' ? '下架' : '解除下架' }}
-            </el-button>
+            <div class="row-actions">
+              <el-button v-permission="'experience:read_all'" link size="small" @click="viewDetail(row)">查看</el-button>
+              <el-button
+                v-permission="'experience:manage'"
+                :type="row.moderationStatus === 'NORMAL' ? 'danger' : 'success'"
+                link size="small"
+                @click="handleToggleStatus(row)"
+              >
+                {{ row.moderationStatus === 'NORMAL' ? '下架' : '重新上架' }}
+              </el-button>
+            </div>
           </template>
         </el-table-column>
         <template #empty>
@@ -124,6 +181,22 @@ onMounted(() => {
         />
       </div>
     </el-card>
+    <el-drawer v-model="detailVisible" title="面经内容" size="min(680px, 100%)">
+      <div v-loading="detailLoading" class="detail-content">
+        <template v-if="detail">
+          <h2>{{ detail.title }}</h2>
+          <p>发布者：{{ detail.username || '用户已注销' }}　公司：{{ detail.companyName || '--' }}　岗位：{{ detail.positionTitle || '--' }}</p>
+          <p>状态：{{ detail.moderationStatus === 'BLOCKED' ? '已下架' : '正常公开' }}</p>
+          <p>发布时间：{{ formatTime(detail.publishedAt) }}</p>
+          <el-divider />
+          <el-empty v-if="!detail.questions?.length" description="没有已选择的题目" />
+          <article v-for="question in detail.questions" :key="question.questionIndex" class="detail-question">
+            <h3>第 {{ question.questionIndex }} 题：{{ question.questionText }}</h3>
+            <p v-if="question.referenceAnswer">AI 标准答案：{{ question.referenceAnswer }}</p>
+          </article>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -131,6 +204,28 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: auto;
+  padding-top: 20px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #fff;
 }
+.admin-experiences { min-height: 100%; display: flex; }
+.management-card { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
+.management-card :deep(.el-card__body) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.filter-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 2fr) auto auto; align-items: center; gap: 8px; min-width: 0; margin-bottom: 18px; }
+.filter-bar :deep(.el-button + .el-button) { margin-left: 0; }
+.filter-bar :deep(.el-input), .filter-bar :deep(.el-select), .filter-bar :deep(.el-date-editor) { width: 100%; min-width: 0; }
+.management-table { width: 100%; }
+.management-table :deep(.el-table__cell) { padding: 8px 0; }
+.management-table :deep(.el-table__row) { height: 50px; }
+.cell-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.row-actions :deep(.el-button + .el-button) { margin-left: 0; }
+@media (max-width: 1000px) {
+  .filter-bar { gap: 5px; }
+  .filter-bar :deep(.el-button) { padding-left: 8px; padding-right: 8px; }
+}
+.detail-question { padding: 12px 0; border-top: 1px solid #e8edf2; white-space: pre-wrap; }
 </style>

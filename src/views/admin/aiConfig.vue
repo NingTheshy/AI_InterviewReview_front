@@ -364,14 +364,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-ai-config { max-width: 1800px; margin: 0 auto; }
+.admin-ai-config { min-height: 100%; width: 100%; max-width: 1800px; margin: 0 auto; display: flex; flex-direction: column; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 0 0 20px; }
 .page-heading h1 { margin: 4px 0 5px; color: #203747; font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
 .page-heading p { margin: 0; color: #7c8c99; font-size: 13px; }
 .page-eyebrow { color: #1b8a8c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
-.config-card { border: 1px solid #e7edf2; border-radius: 8px; box-shadow: 0 5px 20px rgba(29, 56, 76, .04); }
+.config-card { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; border: 1px solid #e7edf2; border-radius: 8px; box-shadow: 0 5px 20px rgba(29, 56, 76, .04); }
 :deep(.config-card .el-card__header) { padding: 15px 20px; border-bottom-color: #edf1f5; }
-:deep(.config-card .el-card__body) { padding: 0 0 16px; }
+:deep(.config-card .el-card__body) { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 0 0 16px; }
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -397,7 +397,12 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
+  margin-top: auto;
   padding: 16px 20px 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #fff;
 }
 
 .test-message {
@@ -412,6 +417,6 @@ onMounted(() => {
   .page-heading { align-items: flex-start; }
   .page-heading h1 { font-size: 20px; }
   .page-heading p { max-width: 220px; line-height: 1.5; }
-  .pagination-wrapper { overflow-x: auto; justify-content: flex-start; }
+  .pagination-wrapper { overflow-x: auto; }
 }
 </style>

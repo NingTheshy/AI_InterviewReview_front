@@ -1,11 +1,12 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getExperienceDetail, getExperienceComments, addComment, deleteComment,
+import { ElMessage } from 'element-plus'
+import { getExperienceDetail, getExperienceComments, addComment,
   likeExperience, unlikeExperience, favoriteExperience, unfavoriteExperience } from '@/api/experience'
 import { useUserStore } from '@/store/useUserStore'
 import UserAvatar from '@/components/UserAvatar.vue'
+import ThreadComment from '@/components/ThreadComment.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,11 +55,6 @@ async function submitComment() {
     ElMessage.success('评论成功')
   } finally { commentLoading.value = false }
 }
-async function removeComment(item) {
-  await ElMessageBox.confirm('确定删除这条评论吗？', '删除评论', { type: 'warning' })
-  await deleteComment(item.id)
-  await fetchComments()
-}
 onMounted(fetchDetail)
 </script>
 
@@ -86,31 +82,27 @@ onMounted(fetchDetail)
         </article>
       </section>
       <section class="card">
-        <h2>评论（{{ commentPagination.total }}）</h2>
+        <h2>评论</h2>
         <div v-if="userStore.isLoggedIn">
           <el-input v-model="commentText" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="写下你的看法" />
           <el-button type="primary" :loading="commentLoading" @click="submitComment">发表评论</el-button>
         </div>
         <el-button v-else link type="primary" @click="router.push('/login')">登录后发表评论</el-button>
-        <div v-for="item in comments" :key="item.id" class="comment">
-          <UserAvatar :size="32" :avatar="item.avatar" />
-          <div><strong>{{ item.nickname || '匿名用户' }}</strong><small>{{ formatTime(item.createdAt) }}</small>
-            <p>{{ item.content }}</p>
-            <el-button v-if="userStore.userInfo && (userStore.userInfo.id === item.userId || userStore.isAdmin)"
-                       link type="danger" @click="removeComment(item)">删除</el-button>
-          </div>
-        </div>
-        <el-pagination v-if="commentPagination.total > commentPagination.size" v-model:current-page="commentPagination.page"
+        <ThreadComment v-for="item in comments" :key="item.id" :item="item" :experience-id="route.params.id" @deleted="fetchComments" />
+      </section>
+      <div v-if="commentPagination.total > commentPagination.size" class="pagination-wrapper">
+        <el-pagination v-model:current-page="commentPagination.page"
                        :page-size="commentPagination.size" :total="commentPagination.total" layout="prev, pager, next"
                        @current-change="fetchComments" />
-      </section>
+      </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-.experience-detail{max-width:960px;margin:28px auto;padding:0 16px 40px;color:#243447}
+.experience-detail{flex:1;display:flex;flex-direction:column;width:100%;max-width:960px;margin:28px auto;padding:0 16px 40px;color:#243447}
+.pagination-wrapper{display:flex;justify-content:center;margin-top:auto;padding-top:24px;position:sticky;bottom:0;z-index:5;background:#f4f7f8}
 .card{background:#fff;border:1px solid #e7edf3;border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 7px 25px #22354a08}
 h1{font-size:28px;margin:0 0 18px}h2{font-size:20px;margin:0 0 18px}.meta,.actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#718096}.actions{margin-top:22px}
-.question{padding:18px 0;border-top:1px solid #edf1f5}.question h3{font-size:17px;margin:0 0 12px;white-space:pre-wrap}.answer{background:#f5f9fb;border-radius:9px;padding:16px;line-height:1.8}.answer p{white-space:pre-wrap;margin:8px 0 0}.comment{display:flex;gap:12px;padding:18px 0;border-bottom:1px solid #edf1f5}.comment small{margin-left:12px;color:#909eaa}.comment p{white-space:pre-wrap}
+.question{padding:18px 0;border-top:1px solid #edf1f5}.question h3{font-size:17px;margin:0 0 12px;white-space:pre-wrap}.answer{background:#f5f9fb;border-radius:9px;padding:16px;line-height:1.8}.answer p{white-space:pre-wrap;margin:8px 0 0}
 </style>

@@ -22,6 +22,46 @@ const rubricStatusLabels = {
   FULLY_COVERED: '完全覆盖', MOSTLY_COVERED: '基本覆盖', PARTIALLY_COVERED: '部分覆盖',
   MISSING: '未提及', INCORRECT: '存在错误', NOT_APPLICABLE: '不适用'
 }
+const questionTypeLabels = {
+  TECHNICAL: '技术问题', OBJECTIVE: '知识问答', PERSONAL: '个人经历',
+  PROJECT: '项目经历', BEHAVIORAL: '情境与做法'
+}
+const difficultyLabels = {
+  L1: '较基础', L2: '需要进一步说明', L3: '需要深入分析',
+  L4: '需要综合运用', L5: '需要设计和权衡'
+}
+const understandingLabels = {
+  1: '了解基本概念', 2: '理解基本原理', 3: '理解背后的运行方式',
+  4: '能深入分析原因和影响', 5: '能考虑整体设计和优化'
+}
+const thinkingLabels = {
+  1: '直接说明一个要点', 2: '联系几个相关要点', 3: '分几步分析问题',
+  4: '综合多个方面给出方案', 5: '在多种条件下权衡方案'
+}
+const experienceUnderstandingLabels = {
+  1: '说清基本情况', 2: '说明事情的经过', 3: '解释自己的做法和原因',
+  4: '分析选择和结果', 5: '说明复杂情况下的取舍和改进'
+}
+
+function questionTypeText(type) {
+  return questionTypeLabels[type] || '其他问题'
+}
+
+function difficultyText(level) {
+  return difficultyLabels[level] || '难度待确认'
+}
+
+function domainText(domain) {
+  return { NON_TECHNICAL: '个人经历与表达', OTHER: '其他方面' }[domain] || domain
+}
+
+function difficultyExplanation(question) {
+  const experienceQuestion = ['PERSONAL', 'PROJECT', 'BEHAVIORAL'].includes(question.questionType)
+  const understanding = (experienceQuestion ? experienceUnderstandingLabels : understandingLabels)[question.knowledgeDepth]
+  const thinking = thinkingLabels[question.problemComplexity]
+  if (understanding && thinking) return `需要${understanding}，并${thinking}。`
+  return ''
+}
 
 // 笔记
 const interviewNote = ref('')
@@ -443,14 +483,14 @@ onMounted(() => {
         <h3 class="section-title">题目难度与领域表现</h3>
         <p>难度只依据题目要求；均分只统计已计分问题，样本少于 2 题时仅供参考。</p>
         <el-table :data="Object.entries(interview.difficultySummary).map(([level, value]) => ({ level, ...value }))" size="small">
-          <el-table-column prop="level" label="难度" />
+          <el-table-column label="题目要求"><template #default="{ row }">{{ difficultyText(row.level) }}</template></el-table-column>
           <el-table-column prop="questionCount" label="题数" />
           <el-table-column prop="averageScore" label="平均分" />
           <el-table-column label="样本"><template #default="{ row }">{{ row.insufficientSample ? '不足' : '充足' }}</template></el-table-column>
         </el-table>
         <el-table v-if="interview.domainSummary && Object.keys(interview.domainSummary).length"
                   :data="Object.entries(interview.domainSummary).map(([domain, value]) => ({ domain, ...value }))" size="small">
-          <el-table-column prop="domain" label="技术领域" />
+          <el-table-column label="涉及内容"><template #default="{ row }">{{ domainText(row.domain) }}</template></el-table-column>
           <el-table-column prop="questionCount" label="题数" />
           <el-table-column prop="averageScore" label="平均分" />
           <el-table-column label="样本"><template #default="{ row }">{{ row.insufficientSample ? '不足' : '充足' }}</template></el-table-column>
@@ -509,7 +549,7 @@ onMounted(() => {
       <!-- 题目评分 -->
       <div class="section-card" v-if="interview.questions && interview.questions.length > 0">
         <h3 class="section-title">📋 题目评分（{{ interview.questions.length }} 题）</h3>
-        <el-collapse>
+        <el-collapse class="score-list">
           <el-collapse-item
             v-for="q in interview.questions"
             :key="q.id"
@@ -519,10 +559,10 @@ onMounted(() => {
             <template #title>
               <div class="question-header">
                 <span class="question-index">第 {{ q.questionIndex }} 题</span>
-                <el-tag size="small" effect="plain">{{ q.questionType || '未分类' }}</el-tag>
-                <el-tag v-if="q.difficultyLevel" size="small" type="warning">{{ q.difficultyLevel }} · K{{ q.knowledgeDepth }}/C{{ q.problemComplexity }}</el-tag>
-                <el-tag v-if="!q.includedInScore" size="small" type="info">低置信度·不计分</el-tag>
-                <el-tag v-if="q.criticalErrors?.length" size="small" type="danger">存在关键错误</el-tag>
+                <el-tag size="small" effect="plain">{{ questionTypeText(q.questionType) }}</el-tag>
+                <el-tag v-if="q.difficultyLevel" size="small" type="warning">{{ difficultyText(q.difficultyLevel) }}</el-tag>
+                <el-tag v-if="!q.includedInScore" size="small" type="info">无法准确判断，暂不计分</el-tag>
+                <el-tag v-if="q.criticalErrors?.length" size="small" type="danger">有重要错误</el-tag>
                 <span class="question-score" :style="{ color: getScoreColor(q.score) }">
                   {{ q.score == null ? '--' : `${q.score} 分` }}
                 </span>
@@ -546,9 +586,11 @@ onMounted(() => {
                 <p v-for="(followUp, index) in q.followUpTexts" :key="index">{{ index + 1 }}. {{ followUp }}</p>
               </div>
               <div class="question-section" v-if="q.difficultyLevel">
-                <h4>题目难度依据</h4>
-                <p>{{ q.domain }} · {{ q.questionCategory }} · {{ q.difficultyLevel }}（知识深度 K{{ q.knowledgeDepth }}，解题复杂度 C{{ q.problemComplexity }}）</p>
-                <p v-if="q.knowledgePoints?.length">知识点：{{ q.knowledgePoints.join('、') }}</p>
+                <h4>这道题考察什么</h4>
+                <p v-if="difficultyExplanation(q)">{{ difficultyExplanation(q) }}</p>
+                <p v-if="q.domain">主要涉及{{ domainText(q.domain) }}。</p>
+                <p v-if="q.questionCategory">这是一道{{ q.questionCategory }}。</p>
+                <p v-if="q.knowledgePoints?.length">还涉及：{{ q.knowledgePoints.join('、') }}</p>
                 <p v-if="q.difficultyReason">{{ q.difficultyReason }}</p>
               </div>
               <div class="question-section" v-if="q.answerText">
@@ -586,11 +628,11 @@ onMounted(() => {
                 </div>
               </div>
               <div class="question-section" v-if="q.answerEvidence?.length">
-                <h4>回答证据</h4>
+                <h4>评分依据</h4>
                 <p v-for="(evidence, index) in q.answerEvidence" :key="index">“{{ evidence }}”</p>
               </div>
               <div class="question-section critical-errors" v-if="q.criticalErrors?.length">
-                <h4>关键错误 · 本题最高 69 分</h4>
+                <h4>有重要错误，本题最高 69 分</h4>
                 <p v-for="(error, index) in q.criticalErrors" :key="index">{{ index + 1 }}. {{ error }}</p>
               </div>
               <div class="question-section rubric" v-if="q.rubricDetail?.items?.length">
@@ -603,7 +645,7 @@ onMounted(() => {
                     </el-tag>
                     <span>{{ item.awardedScore ?? 0 }} / {{ item.weight }} 分</span>
                   </div>
-                  <p v-if="item.evidence">原文证据：“{{ item.evidence }}”</p>
+                  <p v-if="item.evidence">你回答中的原话：“{{ item.evidence }}”</p>
                   <p v-if="item.missingPoints?.length">缺失：{{ item.missingPoints.join('、') }}</p>
                   <p v-if="item.incorrectClaims?.length">错误：{{ item.incorrectClaims.join('、') }}</p>
                 </div>
@@ -991,17 +1033,27 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
   width: 100%;
+}
+
+.score-list :deep(.el-collapse-item__header) {
+  height: auto;
+  min-height: 48px;
+  padding: 8px 0;
+  line-height: 1.4;
 }
 
 .question-index {
   font-weight: 600;
   color: #303133;
+  white-space: nowrap;
 }
 
 .question-score {
   font-weight: bold;
   font-size: 16px;
+  white-space: nowrap;
 }
 
 .question-content {

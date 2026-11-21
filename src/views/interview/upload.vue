@@ -18,6 +18,8 @@ const form = reactive({
   title: '',
   companyName: '',
   positionTitle: '',
+  interviewRound: '',
+  interviewAt: '',
   industry: '',
   interviewType: '',
   jdText: '',
@@ -172,6 +174,8 @@ async function handleSubmit() {
   if (form.title) formData.append('title', form.title)
   if (form.companyName) formData.append('companyName', form.companyName)
   if (form.industry) formData.append('industry', form.industry)
+  if (form.interviewRound) formData.append('interviewRound', form.interviewRound)
+  if (form.interviewAt) formData.append('interviewAt', form.interviewAt)
 
   loading.value = true
   try {
@@ -333,6 +337,19 @@ onBeforeUnmount(stopResumePolling)
             <el-col :span="12">
               <el-form-item label="行业">
                 <el-input v-model="form.industry" placeholder="如：互联网、金融、教育" maxlength="30" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="面试轮次">
+                <el-input v-model="form.interviewRound" placeholder="如：一面（可选）" maxlength="50" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="实际面试时间">
+                <el-date-picker v-model="form.interviewAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss"
+                  placeholder="选择时间（可选）" style="width: 100%" />
               </el-form-item>
             </el-col>
           </el-row>

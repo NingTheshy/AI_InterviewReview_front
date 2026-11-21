@@ -61,22 +61,24 @@ onMounted(load)
       <h3>{{ row.title }}</h3><p>{{ row.positionTitle }} · {{ row.publishStatus === 'PUBLISHED' ? '已发布' : '已删除' }}
         <el-tag v-if="row.moderationStatus === 'BLOCKED'" type="danger">管理员已下架</el-tag></p>
       <el-button v-if="row.publishStatus === 'PUBLISHED' && row.moderationStatus !== 'BLOCKED'" @click="router.push(`/experiences/${row.id}`)">查看</el-button>
-      <el-button @click="open(row)">{{ row.publishStatus === 'PUBLISHED' ? '编辑' : '重新发布' }}</el-button>
-      <el-button v-if="row.publishStatus === 'PUBLISHED'" type="danger" plain @click="remove(row)">删除</el-button>
+      <el-button @click="open(row)">{{ row.moderationStatus === 'BLOCKED' ? '查看内容' : row.publishStatus === 'PUBLISHED' ? '编辑' : '重新发布' }}</el-button>
+      <el-button v-if="row.publishStatus === 'PUBLISHED' && row.moderationStatus !== 'BLOCKED'" type="danger" plain @click="remove(row)">删除</el-button>
     </el-card>
-    <el-pagination v-if="total > 10" v-model:current-page="page" :page-size="10" :total="total" @current-change="load" />
-    <el-dialog v-model="editing" title="编辑题目面经" width="780px">
-      <el-alert v-if="editor?.moderationStatus === 'BLOCKED'" type="error" :closable="false" title="面经已被管理员下架，不能自行重新发布" />
+    <div v-if="total > 10" class="pagination-wrapper">
+      <el-pagination v-model:current-page="page" :page-size="10" :total="total" @current-change="load" />
+    </div>
+    <el-dialog v-model="editing" :title="editor?.moderationStatus === 'BLOCKED' ? '查看已下架面经' : '编辑题目面经'" width="780px">
+      <el-alert v-if="editor?.moderationStatus === 'BLOCKED'" type="error" :closable="false" title="面经已被管理员下架，重新上架前不能编辑或删除" />
       <template v-if="!previewing">
-      <el-input v-model="title" maxlength="200" show-word-limit placeholder="标题" />
-      <p><el-switch v-model="showAnswers" active-text="公开 AI 标准答案" inactive-text="只公开题目" @change="confirmedIds = []" /></p>
+      <el-input v-model="title" :disabled="editor?.moderationStatus === 'BLOCKED'" maxlength="200" show-word-limit placeholder="标题" />
+      <p><el-switch v-model="showAnswers" :disabled="editor?.moderationStatus === 'BLOCKED'" active-text="公开 AI 标准答案" inactive-text="只公开题目" @change="confirmedIds = []" /></p>
       <div class="questions">
         <div v-for="q in editor?.questions || []" :key="q.id" class="question">
-          <el-checkbox v-model="selectedIds" :label="q.id">第 {{ q.questionIndex }} 题：{{ q.questionText }}</el-checkbox>
+          <el-checkbox v-model="selectedIds" :disabled="editor?.moderationStatus === 'BLOCKED'" :label="q.id">第 {{ q.questionIndex }} 题：{{ q.questionText }}</el-checkbox>
           <el-tag v-if="q.sensitive" size="small" type="warning">可能涉及隐私</el-tag>
           <template v-if="selectedIds.includes(q.id)">
             <p v-if="showAnswers">AI 标准答案：{{ q.referenceAnswer || '暂无答案' }}</p>
-            <el-checkbox v-if="q.sensitive" v-model="confirmedIds" :label="q.id">我已逐字预览并确认可以公开</el-checkbox>
+            <el-checkbox v-if="q.sensitive" v-model="confirmedIds" :disabled="editor?.moderationStatus === 'BLOCKED'" :label="q.id">我已逐字预览并确认可以公开</el-checkbox>
           </template>
         </div>
       </div>
@@ -94,4 +96,11 @@ onMounted(load)
     </el-dialog>
   </div>
 </template>
-<style scoped>.page{max-width:1000px;margin:30px auto;padding:0 20px}.post{margin-bottom:16px}.post p{color:#718096}.questions{max-height:420px;overflow:auto}.question{padding:12px;margin:10px 0;border:1px solid #e7edf3;border-radius:8px;white-space:pre-wrap}</style>
+<style scoped>
+.page { flex: 1; display: flex; flex-direction: column; width: 100%; max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+.post { margin-bottom: 16px; }
+.post p { color: #718096; }
+.questions { max-height: 420px; overflow: auto; }
+.question { padding: 12px; margin: 10px 0; border: 1px solid #e7edf3; border-radius: 8px; white-space: pre-wrap; }
+.pagination-wrapper { display: flex; justify-content: center; margin-top: auto; padding-top: 24px; position: sticky; bottom: 0; z-index: 5; background: #f4f7f8; }
+</style>
